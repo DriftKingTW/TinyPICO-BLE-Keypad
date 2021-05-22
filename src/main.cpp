@@ -21,38 +21,7 @@ struct Key {
     char *keyInfo;
 };
 
-struct Key key1;
-struct Key key2;
-struct Key key3;
-struct Key key4;
-struct Key key5;
-struct Key key6;
-struct Key key7;
-struct Key key8;
-struct Key key9;
-struct Key key10;
-struct Key key11;
-struct Key key12;
-struct Key key13;
-struct Key key14;
-struct Key key15;
-struct Key key16;
-struct Key key17;
-struct Key key18;
-struct Key key19;
-struct Key key20;
-struct Key key21;
-struct Key key22;
-struct Key key23;
-struct Key key24;
-struct Key key25;
-struct Key key26;
-struct Key key27;
-struct Key key28;
-struct Key key29;
-struct Key key30;
-struct Key key31;
-struct Key dummy;
+Key key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12, key13, key14, key15, key16, key17, key18, key19, key20, key21, key22, key23, key24, key25, key26, key27, key28, key29, key30, key31, dummy;
 
 Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key7, key8, key9, key10, key11, key12, key13},
