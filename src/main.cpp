@@ -79,9 +79,16 @@ const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
 byte outputs[] = {4, 14, 15, 27, 26};  // row
 const int outputCount = sizeof(outputs) / sizeof(outputs[0]);
 
+// Auto sleep after idle params
+long previousMillis = 0;
+unsigned long currentMillis = 0;
+const long INTERVAL = 10 * 60 * 1000;
+
 // Function declaration
 void initKeys(uint8_t keyLayout[ROWS][COLS], String keyInfo[ROWS][COLS]);
 void goSleeping();
+void checkIdle();
+void resetIdle();
 void renderScreen(String msg);
 void keyPress(Key &key);
 void keyRelease(Key &key);
@@ -112,6 +119,8 @@ void loop() {
     renderScreen("Connecting..");
     breathLEDAnimation();
 
+    checkIdle();
+
     if (bleKeyboard.isConnected()) {
         renderScreen("= Connected =");
         tp.DotStar_SetPower(false);
@@ -119,6 +128,7 @@ void loop() {
 
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
+        checkIdle();
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
             for (int c = 0; c < COLS; c++) {
@@ -144,6 +154,7 @@ void loop() {
                         }
                     } else {
                         keyPress(keyMap[r][c]);
+                        resetIdle();
                     }
                 } else {
                     keyRelease(keyMap[r][c]);
@@ -155,6 +166,24 @@ void loop() {
         }
     }
 }
+
+/**
+ * Check if device is idle for a specified period to determine if it should go
+ * to sleep or not.
+ *
+ */
+void checkIdle() {
+    currentMillis = millis();
+    if (currentMillis - previousMillis > INTERVAL) {
+        goSleeping();
+    }
+}
+
+/**
+ * Update previousMillis' value to reset idle timer
+ *
+ */
+void resetIdle() { previousMillis = currentMillis; }
 
 /**
  * Initialize every Key instance that used in this program
