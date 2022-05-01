@@ -32,13 +32,15 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
+// Default Layout
 uint8_t keyLayout_1[ROWS][COLS] = {
     {KEY_ESC, 49, 50, 51, 52, 53, 49},
     {KEY_TAB, 'q', 'w', 'e', 'r', 't', 8},
     {KEY_LEFT_CTRL, 'a', 's', 'd', 'f', 'g', 49},
     {KEY_LEFT_SHIFT, 'z', 'x', 'c', 'v', 'b', KEY_RETURN},
-    {'h', KEY_LEFT_ALT, KEY_LEFT_GUI, 49, 32, 'h', 49}};
+    {'h', KEY_LEFT_ALT, KEY_LEFT_GUI, 49, 32, KEY_LEFT_GUI, 49}};
 
+// Procreate Shortcuts
 uint8_t keyLayout_2[ROWS][COLS] = {
     {KEY_ESC, 49, 50, 51, 52, 53, 49},
     {KEY_TAB, 's', 'w', 'e', '[', ']', 8},
@@ -48,6 +50,7 @@ uint8_t keyLayout_2[ROWS][COLS] = {
 
 byte currentLayout = 2;
 
+// Default Layout
 String keyInfo_1[ROWS][COLS] = {
     {"ESC", "1", "2", "3", "4", "5", "NULL"},
 
@@ -59,6 +62,7 @@ String keyInfo_1[ROWS][COLS] = {
 
     {"FN", "OPTION", "COMMAND", "NULL", "SPACE", "H", "NULL"}};
 
+// Procreate Shortcuts
 String keyInfo_2[ROWS][COLS] = {
     {"ESC", "1", "2", "3", "4", "5", "NULL"},
 
@@ -68,7 +72,7 @@ String keyInfo_2[ROWS][COLS] = {
 
     {"SHIFT", "Z", "X", "C(Colors)", "V(Transform)", "B", "RETURN"},
 
-    {"FN", "OPTION", "COMMAND", "NULL", "SPACE", "H", "NULL"}};
+    {"FN", "OPTION", "COMMAND", "NULL", "SPACE", "COMMAND", "NULL"}};
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
 const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
