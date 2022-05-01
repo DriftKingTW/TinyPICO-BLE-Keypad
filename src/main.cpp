@@ -123,10 +123,21 @@ void loop() {
                     // low
                     if (r == 1 && c == 0) {
                         goSleeping();
-                    }
-                    else if (r == 4 && c == 0) {
+                    } else if (r == 4 && c == 1) {
                         // Show battery level if the Fn key is pressed
                         showBatteryState();
+                    } else if (r == 4 && c == 0) {
+                        if (currentLayout == 1) {
+                            currentLayout = 2;
+                            initKeys(keyLayout_2, keyInfo_2);
+                            renderScreen("Layout 1");
+                            delay(500);
+                        } else {
+                            currentLayout = 1;
+                            initKeys(keyLayout_1, keyInfo_1);
+                            renderScreen("Layout 2");
+                            delay(500);
+                        }
                     } else {
                         keyPress(keyMap[r][c]);
                     }
