@@ -275,22 +275,15 @@ void showBatteryState() {
  * @param {char} array to print on oled screen
  */
 void renderScreen(String msg) {
+    // string to char array
     int n = msg.length();
     char char_array[n + 1];
-    // string to char array
     strcpy(char_array, msg.c_str());
 
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB08_tr);
+    u8g2.setFont(u8g2_font_profont15_tr);
     u8g2.setFontPosCenter();
     u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 16, char_array);
-    // u8g2.setCursor(0, 15);
-    // float bat = tp.GetBatteryVoltage();
-    // if (tp.IsChargingBattery())
-    //     u8g2.print((char *)"Charging");
-    // else
-    //     u8g2.print((char *)"Not Charging");
-    // u8g2.print(bat, 2);
     u8g2.sendBuffer();
 }
 
