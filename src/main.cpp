@@ -144,12 +144,12 @@ void loop() {
                         if (currentLayout == 1) {
                             currentLayout = 2;
                             initKeys(keyLayout_2, keyInfo_2);
-                            renderScreen("Layout 1");
+                            renderScreen("Procreate Layout");
                             delay(500);
                         } else {
                             currentLayout = 1;
                             initKeys(keyLayout_1, keyInfo_1);
-                            renderScreen("Layout 2");
+                            renderScreen("Default Layout");
                             delay(500);
                         }
                     } else {
