@@ -254,18 +254,42 @@ void keyRelease(Key &key) {
  */
 void showBatteryState() {
     String result = "";
+    char *batteryIcon = "\u005A";
     bool plugged = digitalRead(9);
     bool charging = tp.IsChargingBattery();
     if (plugged && charging) {
         result = "Charged";
+        batteryIcon = "\u0060";
     } else if (plugged) {
         result = "Plugged in";
+        batteryIcon = "\u0060";
     } else {
         int batteryPercentage = getBatteryPercentage();
         result = "Bat. " + String(batteryPercentage) + "%";
+        if (batteryPercentage > 75) {
+            batteryIcon = "\u005B";
+        } else if (batteryPercentage > 50) {
+            batteryIcon = "\u005A";
+        } else if (batteryPercentage > 25) {
+            batteryIcon = "\u005A";
+        }
     }
-    renderScreen(result);
+
+    int n = result.length();
+    char char_array[n];
+    strcpy(char_array, result.c_str());
+
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
+    u8g2.setFontPosCenter();
+    u8g2.drawStr((64 - u8g2.getStrWidth(batteryIcon) / 2) - 32, 16,
+                 batteryIcon);
+    u8g2.setFont(u8g2_font_ncenB08_tr);
+    u8g2.setFontPosCenter();
+    u8g2.drawStr((64 - u8g2.getStrWidth(char_array) / 2) + 8, 16, char_array);
     Serial.println(result);
+    u8g2.sendBuffer();
+
     delay(100);
 }
 
@@ -281,7 +305,7 @@ void renderScreen(String msg) {
     strcpy(char_array, msg.c_str());
 
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_profont15_tr);
+    u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
     u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 16, char_array);
     u8g2.sendBuffer();
