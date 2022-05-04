@@ -13,6 +13,23 @@
 #define ROWS 5
 #define COLS 7
 
+String keyMapJSON =
+    "[{\"title\":\"Default\",\"keymap\":[[177,49,50,51,52,53,49],[179,113,"
+    "119,101,114,116,8],[128,97,115,100,102,103,49],[129,122,120,99,118,98,"
+    "176],[104,130,135,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\","
+    "\"3\",\"4\",\"5\",\"NULL\"],[\"TAB\",\"Q\",\"W\",\"E\",\"R\",\"T\","
+    "\"DELETE\"],[\"CTRL\",\"A\",\"S\",\"D\",\"F\",\"G\",\"NULL\"],["
+    "\"SHIFT\",\"Z\",\"X\",\"C\",\"V\",\"B\",\"RETURN\"],[\"FN\","
+    "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"H\",\"NULL\"]]},{"
+    "\"title\":\"Procreate\",\"keymap\":[[177,49,50,51,52,53,49],[179,115,"
+    "119,101,91,93,8],[128,91,93,108,98,103,49],[129,122,120,99,118,98,176]"
+    ",[104,130,131,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\",\"3\","
+    "\"4\",\"5\",\"NULL\"],[\"TAB\",\"Select\",\"W\",\"Eraser\","
+    "\"BrushDown\",\"BrushUp\",\"DELETE\"],[\"CTRL\",\"BrushDown\","
+    "\"BrushUp\",\"Layers\",\"Brush\",\"G\",\"NULL\"],[\"SHIFT\",\"Z\","
+    "\"X\",\"C(Colors)\",\"V(Transform)\",\"B\",\"RETURN\"],[\"FN\","
+    "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"COMMAND\",\"NULL\"]]}]";
+
 // U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /*
 // reset=*/U8X8_PIN_NONE);
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
@@ -36,7 +53,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
 byte currentLayoutIndex = 0;
-DynamicJsonDocument doc(4096);
+const short jsonDocSize = 4096;
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
 const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
@@ -49,7 +66,7 @@ unsigned long currentMillis = 0;
 const long INTERVAL = 10 * 60 * 1000;
 
 // Function declaration
-void initKeys(DynamicJsonDocument doc, byte currentLayoutIndex);
+void initKeys();
 void goSleeping();
 void checkIdle();
 void resetIdle();
@@ -67,31 +84,6 @@ void setup() {
     Serial.println("Set CPU clock speed to 80Mhz to reduce power consumption");
     setCpuFrequencyMhz(80);
 
-    Serial.println("Reading JSON keymap configuration...");
-    char keyMapJSON[] =
-        "[{\"title\":\"Default\",\"keymap\":[[177,49,50,51,52,53,49],[179,113,"
-        "119,101,114,116,8],[128,97,115,100,102,103,49],[129,122,120,99,118,98,"
-        "176],[104,130,135,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\","
-        "\"3\",\"4\",\"5\",\"NULL\"],[\"TAB\",\"Q\",\"W\",\"E\",\"R\",\"T\","
-        "\"DELETE\"],[\"CTRL\",\"A\",\"S\",\"D\",\"F\",\"G\",\"NULL\"],["
-        "\"SHIFT\",\"Z\",\"X\",\"C\",\"V\",\"B\",\"RETURN\"],[\"FN\","
-        "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"H\",\"NULL\"]]},{"
-        "\"title\":\"Procreate\",\"keymap\":[[177,49,50,51,52,53,49],[179,115,"
-        "119,101,91,93,8],[128,91,93,108,98,103,49],[129,122,120,99,118,98,176]"
-        ",[104,130,131,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\",\"3\","
-        "\"4\",\"5\",\"NULL\"],[\"TAB\",\"Select\",\"W\",\"Eraser\","
-        "\"BrushDown\",\"BrushUp\",\"DELETE\"],[\"CTRL\",\"BrushDown\","
-        "\"BrushUp\",\"Layers\",\"Brush\",\"G\",\"NULL\"],[\"SHIFT\",\"Z\","
-        "\"X\",\"C(Colors)\",\"V(Transform)\",\"B\",\"RETURN\"],[\"FN\","
-        "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"COMMAND\",\"NULL\"]]}]";
-
-    DeserializationError err = deserializeJson(
-        doc, keyMapJSON, DeserializationOption::NestingLimit(10));
-    if (err) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(err.c_str());
-    }
-
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
 
@@ -100,7 +92,7 @@ void setup() {
 
     Serial.println("Configuring input pin...");
     currentLayoutIndex = 1;
-    initKeys(doc, currentLayoutIndex);
+    initKeys();
 
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
@@ -136,8 +128,7 @@ void loop() {
                         } else {
                             currentLayoutIndex = 0;
                         }
-                        initKeys(doc, currentLayoutIndex);
-                        renderScreen(doc[currentLayoutIndex]["title"]);
+                        initKeys();
                         delay(500);
                     } else {  // Standard key press
                         keyPress(keyMap[r][c]);
@@ -175,16 +166,25 @@ void resetIdle() { previousMillis = currentMillis; }
 /**
  * Initialize every Key instance that used in this program
  *
- * @param {doc} Keymap & key info JSON document
- * @param {mapIndex} Specific keymap index
  */
-void initKeys(DynamicJsonDocument doc, byte mapIndex) {
+void initKeys() {
+    Serial.println("Reading JSON keymap configuration...");
+
+    DynamicJsonDocument doc(jsonDocSize);
+    DeserializationError err = deserializeJson(
+        doc, keyMapJSON, DeserializationOption::NestingLimit(5));
+    if (err) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(err.c_str());
+    }
+
     uint8_t keyLayout[ROWS][COLS];
     String keyInfo[ROWS][COLS];
 
-    copyArray(doc[mapIndex]["keymap"], keyLayout);
-    copyArray(doc[mapIndex]["keyInfo"], keyInfo);
+    copyArray(doc[currentLayoutIndex]["keymap"], keyLayout);
+    copyArray(doc[currentLayoutIndex]["keyInfo"], keyInfo);
 
+    // GPIO configuration
     for (int i = 0; i < outputCount; i++) {
         pinMode(outputs[i], OUTPUT);
         digitalWrite(outputs[i], HIGH);
@@ -194,6 +194,7 @@ void initKeys(DynamicJsonDocument doc, byte mapIndex) {
         pinMode(inputs[i], INPUT_PULLUP);
     }
 
+    // Assign keymap data
     for (int r = 0; r < ROWS; r++) {
         for (int c = 0; c < COLS; c++) {
             keyMap[r][c].keyStroke = keyLayout[r][c];
@@ -201,6 +202,10 @@ void initKeys(DynamicJsonDocument doc, byte mapIndex) {
             keyMap[r][c].state = false;
         }
     }
+
+    // Show layout title on screen
+    String layoutStr = doc[currentLayoutIndex]["title"];
+    renderScreen("Layout: " + layoutStr);
 }
 
 /**
