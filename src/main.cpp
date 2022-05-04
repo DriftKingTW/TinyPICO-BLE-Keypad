@@ -65,6 +65,7 @@ void setup() {
     Serial.println("Set CPU clock speed to 80Mhz to reduce power consumption");
     setCpuFrequencyMhz(80);
 
+    Serial.println("Reading JSON keymap configuration...");
     char keyMapJSON[] =
         "[{\"title\":\"Default\",\"keymap\":[[\"KEY_ESC\",49,50,51,52,53,49],["
         "\"KEY_TAB\",\"q\",\"w\",\"e\",\"r\",\"t\",8],[\"KEY_LEFT_CTRL\","
@@ -103,7 +104,10 @@ void setup() {
     currentLayoutIndex = 1;
     initKeys(doc, currentLayoutIndex);
 
+    Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+    Serial.println("Setup finished!");
 }
 
 void loop() {
@@ -179,7 +183,7 @@ void resetIdle() { previousMillis = currentMillis; }
 void initKeys(DynamicJsonDocument doc, byte mapIndex) {
     uint8_t keyLayout[ROWS][COLS];
     String keyInfo[ROWS][COLS];
-    
+
     copyArray(doc[mapIndex]["keymap"], keyLayout);
     copyArray(doc[mapIndex]["keyInfo"], keyInfo);
 
