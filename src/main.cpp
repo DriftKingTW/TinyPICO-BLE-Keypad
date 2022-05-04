@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <BleKeyboard.h>
 #include <TinyPICO.h>
 #include <U8g2lib.h>
@@ -32,47 +33,8 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
-// Default Layout
-uint8_t keyLayout_1[ROWS][COLS] = {
-    {KEY_ESC, 49, 50, 51, 52, 53, 49},
-    {KEY_TAB, 'q', 'w', 'e', 'r', 't', 8},
-    {KEY_LEFT_CTRL, 'a', 's', 'd', 'f', 'g', 49},
-    {KEY_LEFT_SHIFT, 'z', 'x', 'c', 'v', 'b', KEY_RETURN},
-    {'h', KEY_LEFT_ALT, KEY_LEFT_GUI, 49, 32, KEY_LEFT_GUI, 49}};
-
-// Procreate Shortcuts
-uint8_t keyLayout_2[ROWS][COLS] = {
-    {KEY_ESC, 49, 50, 51, 52, 53, 49},
-    {KEY_TAB, 's', 'w', 'e', '[', ']', 8},
-    {KEY_LEFT_CTRL, '[', ']', 'l', 'b', 'g', 49},
-    {KEY_LEFT_SHIFT, 'z', 'x', 'c', 'v', 'b', KEY_RETURN},
-    {'h', KEY_LEFT_ALT, KEY_LEFT_GUI, 49, 32, KEY_LEFT_GUI, 49}};
-
-byte currentLayout = 2;
-
-// Default Layout
-String keyInfo_1[ROWS][COLS] = {
-    {"ESC", "1", "2", "3", "4", "5", "NULL"},
-
-    {"TAB", "Q", "W", "E", "R", "T", "DELETE"},
-
-    {"CTRL", "A", "S", "D", "F", "G", "NULL"},
-
-    {"SHIFT", "Z", "X", "C", "V", "B", "RETURN"},
-
-    {"FN", "OPTION", "COMMAND", "NULL", "SPACE", "H", "NULL"}};
-
-// Procreate Shortcuts
-String keyInfo_2[ROWS][COLS] = {
-    {"ESC", "1", "2", "3", "4", "5", "NULL"},
-
-    {"TAB", "Select", "W", "Eraser", "Brush Down", "Brush Up", "DELETE"},
-
-    {"CTRL", "Brush Down", "Brush Up", "Layers", "Brush", "G", "NULL"},
-
-    {"SHIFT", "Z", "X", "C(Colors)", "V(Transform)", "B", "RETURN"},
-
-    {"FN", "OPTION", "COMMAND", "NULL", "SPACE", "COMMAND", "NULL"}};
+byte currentLayoutIndex = 0;
+DynamicJsonDocument doc(4096);
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
 const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
@@ -85,7 +47,7 @@ unsigned long currentMillis = 0;
 const long INTERVAL = 10 * 60 * 1000;
 
 // Function declaration
-void initKeys(uint8_t keyLayout[ROWS][COLS], String keyInfo[ROWS][COLS]);
+void initKeys(DynamicJsonDocument doc, byte currentLayoutIndex);
 void goSleeping();
 void checkIdle();
 void resetIdle();
@@ -103,6 +65,34 @@ void setup() {
     Serial.println("Set CPU clock speed to 80Mhz to reduce power consumption");
     setCpuFrequencyMhz(80);
 
+    char keyMapJSON[] =
+        "[{\"title\":\"Default\",\"keymap\":[[\"KEY_ESC\",49,50,51,52,53,49],["
+        "\"KEY_TAB\",\"q\",\"w\",\"e\",\"r\",\"t\",8],[\"KEY_LEFT_CTRL\","
+        "\"a\",\"s\",\"d\",\"f\",\"g\",49],[\"KEY_LEFT_SHIFT\",\"z\",\"x\","
+        "\"c\",\"v\",\"b\",\"KEY_RETURN\"],[\"h\",\"KEY_LEFT_ALT\",\"KEY_LEFT_"
+        "GUI\",49,32,\"KEY_LEFT_GUI\",49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\","
+        "\"3\",\"4\",\"5\",\"NULL\"],[\"TAB\",\"Q\",\"W\",\"E\",\"R\",\"T\","
+        "\"DELETE\"],[\"CTRL\",\"A\",\"S\",\"D\",\"F\",\"G\",\"NULL\"],["
+        "\"SHIFT\",\"Z\",\"X\",\"C\",\"V\",\"B\",\"RETURN\"],[\"FN\","
+        "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"H\",\"NULL\"]]},{"
+        "\"title\":\"Procreate\",\"keymap\":[[\"KEY_ESC\",49,50,51,52,53,49],["
+        "\"KEY_TAB\",\"s\",\"w\",\"e\",\"[\",\"]\",8],[\"KEY_LEFT_CTRL\",\"["
+        "\",\"]\",\"l\",\"b\",\"g\",49],[\"KEY_LEFT_SHIFT\",\"z\",\"x\",\"c\","
+        "\"v\",\"b\",\"KEY_RETURN\"],[\"h\",\"KEY_LEFT_ALT\",\"KEY_LEFT_GUI\","
+        "49,32,\"KEY_LEFT_GUI\",49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\",\"3\","
+        "\"4\",\"5\",\"NULL\"],[\"TAB\",\"Select\",\"W\",\"Eraser\","
+        "\"BrushDown\",\"BrushUp\",\"DELETE\"],[\"CTRL\",\"BrushDown\","
+        "\"BrushUp\",\"Layers\",\"Brush\",\"G\",\"NULL\"],[\"SHIFT\",\"Z\","
+        "\"X\",\"C(Colors)\",\"V(Transform)\",\"B\",\"RETURN\"],[\"FN\","
+        "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"COMMAND\",\"NULL\"]]}]";
+
+    DeserializationError err = deserializeJson(
+        doc, keyMapJSON, DeserializationOption::NestingLimit(10));
+    if (err) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(err.c_str());
+    }
+
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
 
@@ -110,7 +100,8 @@ void setup() {
     u8g2.begin();
 
     Serial.println("Configuring input pin...");
-    initKeys(keyLayout_2, keyInfo_2);
+    currentLayoutIndex = 1;
+    initKeys(doc, currentLayoutIndex);
 
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
 }
@@ -133,26 +124,20 @@ void loop() {
             digitalWrite(outputs[r], LOW);  // Setting one row low
             for (int c = 0; c < COLS; c++) {
                 if (digitalRead(inputs[c]) == ACTIVE) {
-                    // Calling keyPressed function if one of the inputs reads
-                    // low
-                    if (r == 1 && c == 0) {
+                    if (r == 1 && c == 0) {  // Enter deep sleep mode
                         goSleeping();
-                    } else if (r == 4 && c == 1) {
-                        // Show battery level if the Fn key is pressed
+                    } else if (r == 4 && c == 1) {  // Show battery level
                         showBatteryState();
-                    } else if (r == 4 && c == 0) {
-                        if (currentLayout == 1) {
-                            currentLayout = 2;
-                            initKeys(keyLayout_2, keyInfo_2);
-                            renderScreen("Procreate Layout");
-                            delay(500);
+                    } else if (r == 4 && c == 0) {  // Switch layout
+                        if (currentLayoutIndex < 1) {
+                            currentLayoutIndex++;
                         } else {
-                            currentLayout = 1;
-                            initKeys(keyLayout_1, keyInfo_1);
-                            renderScreen("Default Layout");
-                            delay(500);
+                            currentLayoutIndex = 0;
                         }
-                    } else {
+                        initKeys(doc, currentLayoutIndex);
+                        renderScreen(doc[currentLayoutIndex]["title"]);
+                        delay(500);
+                    } else {  // Standard key press
                         keyPress(keyMap[r][c]);
                         resetIdle();
                     }
@@ -188,8 +173,16 @@ void resetIdle() { previousMillis = currentMillis; }
 /**
  * Initialize every Key instance that used in this program
  *
+ * @param {doc} Keymap & key info JSON document
+ * @param {mapIndex} Specific keymap index
  */
-void initKeys(uint8_t keyLayout[ROWS][COLS], String keyInfo[ROWS][COLS]) {
+void initKeys(DynamicJsonDocument doc, byte mapIndex) {
+    uint8_t keyLayout[ROWS][COLS];
+    String keyInfo[ROWS][COLS];
+    
+    copyArray(doc[mapIndex]["keymap"], keyLayout);
+    copyArray(doc[mapIndex]["keyInfo"], keyInfo);
+
     for (int i = 0; i < outputCount; i++) {
         pinMode(outputs[i], OUTPUT);
         digitalWrite(outputs[i], HIGH);
