@@ -13,8 +13,10 @@
 #define ROWS 5
 #define COLS 7
 
-// U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+// U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /*
+// reset=*/U8X8_PIN_NONE);
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
+                                            /* reset=*/U8X8_PIN_NONE);
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 TinyPICO tp = TinyPICO();
 
@@ -67,20 +69,16 @@ void setup() {
 
     Serial.println("Reading JSON keymap configuration...");
     char keyMapJSON[] =
-        "[{\"title\":\"Default\",\"keymap\":[[\"KEY_ESC\",49,50,51,52,53,49],["
-        "\"KEY_TAB\",\"q\",\"w\",\"e\",\"r\",\"t\",8],[\"KEY_LEFT_CTRL\","
-        "\"a\",\"s\",\"d\",\"f\",\"g\",49],[\"KEY_LEFT_SHIFT\",\"z\",\"x\","
-        "\"c\",\"v\",\"b\",\"KEY_RETURN\"],[\"h\",\"KEY_LEFT_ALT\",\"KEY_LEFT_"
-        "GUI\",49,32,\"KEY_LEFT_GUI\",49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\","
+        "[{\"title\":\"Default\",\"keymap\":[[177,49,50,51,52,53,49],[179,113,"
+        "119,101,114,116,8],[128,97,115,100,102,103,49],[129,122,120,99,118,98,"
+        "176],[104,130,135,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\","
         "\"3\",\"4\",\"5\",\"NULL\"],[\"TAB\",\"Q\",\"W\",\"E\",\"R\",\"T\","
         "\"DELETE\"],[\"CTRL\",\"A\",\"S\",\"D\",\"F\",\"G\",\"NULL\"],["
         "\"SHIFT\",\"Z\",\"X\",\"C\",\"V\",\"B\",\"RETURN\"],[\"FN\","
         "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"H\",\"NULL\"]]},{"
-        "\"title\":\"Procreate\",\"keymap\":[[\"KEY_ESC\",49,50,51,52,53,49],["
-        "\"KEY_TAB\",\"s\",\"w\",\"e\",\"[\",\"]\",8],[\"KEY_LEFT_CTRL\",\"["
-        "\",\"]\",\"l\",\"b\",\"g\",49],[\"KEY_LEFT_SHIFT\",\"z\",\"x\",\"c\","
-        "\"v\",\"b\",\"KEY_RETURN\"],[\"h\",\"KEY_LEFT_ALT\",\"KEY_LEFT_GUI\","
-        "49,32,\"KEY_LEFT_GUI\",49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\",\"3\","
+        "\"title\":\"Procreate\",\"keymap\":[[177,49,50,51,52,53,49],[179,115,"
+        "119,101,91,93,8],[128,91,93,108,98,103,49],[129,122,120,99,118,98,176]"
+        ",[104,130,131,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\",\"3\","
         "\"4\",\"5\",\"NULL\"],[\"TAB\",\"Select\",\"W\",\"Eraser\","
         "\"BrushDown\",\"BrushUp\",\"DELETE\"],[\"CTRL\",\"BrushDown\","
         "\"BrushUp\",\"Layers\",\"Brush\",\"G\",\"NULL\"],[\"SHIFT\",\"Z\","
