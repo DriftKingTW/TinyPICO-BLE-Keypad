@@ -146,24 +146,6 @@ void loop() {
 }
 
 /**
- * Check if device is idle for a specified period to determine if it should go
- * to sleep or not.
- *
- */
-void checkIdle() {
-    currentMillis = millis();
-    if (currentMillis - previousMillis > INTERVAL) {
-        goSleeping();
-    }
-}
-
-/**
- * Update previousMillis' value to reset idle timer
- *
- */
-void resetIdle() { previousMillis = currentMillis; }
-
-/**
  * Initialize every Key instance that used in this program
  *
  */
@@ -206,20 +188,6 @@ void initKeys() {
     // Show layout title on screen
     String layoutStr = doc[currentLayoutIndex]["title"];
     renderScreen("Layout: " + layoutStr);
-}
-
-/**
- * Enter deep sleep mode
- *
- */
-void goSleeping() {
-    u8g2.clearBuffer();
-    u8g2.sendBuffer();
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-    gpio_pulldown_en(GPIO_NUM_15);
-    // gpio_pulldown_en(GPIO_NUM_27);
-    // gpio_pulldown_en(GPIO_NUM_26);
-    esp_deep_sleep_start();
 }
 
 /**
@@ -294,6 +262,25 @@ void showBatteryState() {
 }
 
 /**
+ * Breath LED Animation
+ *
+ */
+void breathLEDAnimation() {
+    int brightness = 0;
+    tp.DotStar_SetPower(true);
+    // Brighten LED step by step
+    for (; brightness <= 50; brightness++) {
+        tp.DotStar_SetPixelColor(0, brightness, 0);
+        delayMicroseconds(5);
+    }
+    // Dimming LED step by step
+    for (; brightness >= 0; brightness--) {
+        delayMicroseconds(5);
+        tp.DotStar_SetPixelColor(0, brightness, 0);
+    }
+}
+
+/**
  * Print message on oled screen.
  *
  * @param {char} array to print on oled screen
@@ -350,20 +337,33 @@ int getBatteryPercentage() {
 }
 
 /**
- * Breath LED Animation
+ * Enter deep sleep mode
  *
  */
-void breathLEDAnimation() {
-    int brightness = 0;
-    tp.DotStar_SetPower(true);
-    // Brighten LED step by step
-    for (; brightness <= 50; brightness++) {
-        tp.DotStar_SetPixelColor(0, brightness, 0);
-        delayMicroseconds(5);
-    }
-    // Dimming LED step by step
-    for (; brightness >= 0; brightness--) {
-        delayMicroseconds(5);
-        tp.DotStar_SetPixelColor(0, brightness, 0);
+void goSleeping() {
+    u8g2.clearBuffer();
+    u8g2.sendBuffer();
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+    gpio_pulldown_en(GPIO_NUM_15);
+    // gpio_pulldown_en(GPIO_NUM_27);
+    // gpio_pulldown_en(GPIO_NUM_26);
+    esp_deep_sleep_start();
+}
+
+/**
+ * Check if device is idle for a specified period to determine if it should go
+ * to sleep or not.
+ *
+ */
+void checkIdle() {
+    currentMillis = millis();
+    if (currentMillis - previousMillis > INTERVAL) {
+        goSleeping();
     }
 }
+
+/**
+ * Update previousMillis' value to reset idle timer
+ *
+ */
+void resetIdle() { previousMillis = currentMillis; }
