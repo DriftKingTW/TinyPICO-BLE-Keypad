@@ -38,6 +38,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
 byte currentLayoutIndex = 0;
+byte layoutLength = 0;
 const short jsonDocSize = 4096;
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
@@ -126,7 +127,7 @@ void loop() {
                     } else if (r == 4 && c == 1) {  // Show battery level
                         showBatteryState();
                     } else if (r == 4 && c == 0) {  // Switch layout
-                        if (currentLayoutIndex < 1) {
+                        if (currentLayoutIndex < layoutLength - 1) {
                             currentLayoutIndex++;
                         } else {
                             currentLayoutIndex = 0;
@@ -168,6 +169,8 @@ void initKeys() {
 
     copyArray(doc[currentLayoutIndex]["keymap"], keyLayout);
     copyArray(doc[currentLayoutIndex]["keyInfo"], keyInfo);
+
+    layoutLength = doc.size();
 
     // GPIO configuration
     for (int i = 0; i < outputCount; i++) {
