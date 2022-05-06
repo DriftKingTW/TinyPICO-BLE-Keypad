@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <BleKeyboard.h>
+#include <SPIFFS.h>
 #include <TinyPICO.h>
 #include <U8g2lib.h>
 
 #include <cstring>
+#include <fstream>
 
 #define BLE_NAME "TinyPICO BLE"
 #define AUTHOR "DriftKingTW"
@@ -13,22 +15,7 @@
 #define ROWS 5
 #define COLS 7
 
-String keyMapJSON =
-    "[{\"title\":\"Default\",\"keymap\":[[177,49,50,51,52,53,49],[179,113,"
-    "119,101,114,116,8],[128,97,115,100,102,103,49],[129,122,120,99,118,98,"
-    "176],[104,130,135,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\","
-    "\"3\",\"4\",\"5\",\"NULL\"],[\"TAB\",\"Q\",\"W\",\"E\",\"R\",\"T\","
-    "\"DELETE\"],[\"CTRL\",\"A\",\"S\",\"D\",\"F\",\"G\",\"NULL\"],["
-    "\"SHIFT\",\"Z\",\"X\",\"C\",\"V\",\"B\",\"RETURN\"],[\"FN\","
-    "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"H\",\"NULL\"]]},{"
-    "\"title\":\"Procreate\",\"keymap\":[[177,49,50,51,52,53,49],[179,115,"
-    "119,101,91,93,8],[128,91,93,108,98,103,49],[129,122,120,99,118,98,176]"
-    ",[104,130,131,49,32,131,49]],\"keyInfo\":[[\"ESC\",\"1\",\"2\",\"3\","
-    "\"4\",\"5\",\"NULL\"],[\"TAB\",\"Select\",\"W\",\"Eraser\","
-    "\"BrushDown\",\"BrushUp\",\"DELETE\"],[\"CTRL\",\"BrushDown\","
-    "\"BrushUp\",\"Layers\",\"Brush\",\"G\",\"NULL\"],[\"SHIFT\",\"Z\","
-    "\"X\",\"C(Colors)\",\"V(Transform)\",\"B\",\"RETURN\"],[\"FN\","
-    "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"COMMAND\",\"NULL\"]]}]";
+String keyMapJSON;
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
                                             /* reset=*/U8X8_PIN_NONE);
@@ -87,6 +74,24 @@ void setup() {
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
+
+    if (!SPIFFS.begin(true)) {
+        Serial.println("An Error has occurred while mounting SPIFFS");
+        return;
+    }
+
+    Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
+    File file = SPIFFS.open("/keyconfig.json");
+    if (!file) {
+        Serial.println("Failed to open file for reading");
+        return;
+    }
+
+    keyMapJSON = "";
+    while (file.available()) {
+        keyMapJSON += (char)file.read();
+    }
+    file.close();
 
     Serial.println("Configuring input pin...");
     currentLayoutIndex = 1;
