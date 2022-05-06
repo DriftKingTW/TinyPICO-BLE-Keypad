@@ -30,8 +30,6 @@ String keyMapJSON =
     "\"X\",\"C(Colors)\",\"V(Transform)\",\"B\",\"RETURN\"],[\"FN\","
     "\"OPTION\",\"COMMAND\",\"NULL\",\"SPACE\",\"COMMAND\",\"NULL\"]]}]";
 
-// U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /*
-// reset=*/U8X8_PIN_NONE);
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
                                             /* reset=*/U8X8_PIN_NONE);
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
@@ -324,11 +322,6 @@ int getBatteryPercentage() {
     // Convert to percentage
     float percentage =
         (batteryVoltage - minVoltage) / (fullVolatge - minVoltage) * 100;
-
-    // percentage =
-    //     percentage >= 100
-    //         ? 100
-    //         : static_cast<int>((percentage + 0.5 - (percentage < 0)) + 5);
 
     // Update device's battery level
     bleKeyboard.setBatteryLevel(percentage);
