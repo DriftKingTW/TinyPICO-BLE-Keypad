@@ -1,1 +1,1 @@
-# TinyPICO-BLE-Marco-Pad
+# TinyPICO BLE Keypad
