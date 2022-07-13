@@ -141,10 +141,10 @@ void loop() {
                 } else {
                     keyRelease(keyMap[r][c]);
                 }
-                delayMicroseconds(5);
+                delayMicroseconds(10);
             }
             digitalWrite(outputs[r], HIGH);  // Setting the row back to high
-            delayMicroseconds(5);
+            delayMicroseconds(10);
         }
     }
 }
