@@ -315,7 +315,7 @@ float getBatteryVoltage() { return tp.GetBatteryVoltage(); }
  *
  */
 int getBatteryPercentage() {
-    const float minVoltage = 3.15, fullVolatge = 4.05;
+    const float minVoltage = 3.4, fullVolatge = 4.05;
     // Get average battery voltage value from 10 time periods for more stable
     // result
     float batteryVoltage = 0;
