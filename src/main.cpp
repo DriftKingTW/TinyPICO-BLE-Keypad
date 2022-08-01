@@ -231,14 +231,14 @@ void showBatteryState() {
     char *batteryIcon = "\u005A";
     bool plugged = digitalRead(9);
     bool charging = tp.IsChargingBattery();
+    int batteryPercentage = getBatteryPercentage();
     if (plugged && charging) {
-        result = "Charged";
+        result = "Charging";
         batteryIcon = "\u0060";
     } else if (plugged) {
         result = "Plugged in";
         batteryIcon = "\u0060";
     } else {
-        int batteryPercentage = getBatteryPercentage();
         result = "Bat. " + String(batteryPercentage) + "%";
         if (batteryPercentage > 75) {
             batteryIcon = "\u005B";
@@ -315,7 +315,7 @@ float getBatteryVoltage() { return tp.GetBatteryVoltage(); }
  *
  */
 int getBatteryPercentage() {
-    const float minVoltage = 3.4, fullVolatge = 4.05;
+    const float minVoltage = 3.4, fullVolatge = 4.0;
     // Get average battery voltage value from 10 time periods for more stable
     // result
     float batteryVoltage = 0;
