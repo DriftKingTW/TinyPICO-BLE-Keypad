@@ -46,15 +46,22 @@ const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
 byte outputs[] = {4, 14, 15, 27, 26};  // row
 const int outputCount = sizeof(outputs) / sizeof(outputs[0]);
 
-// Auto sleep after idle params
-long previousMillis = 0;
-unsigned long currentMillis = 0;
-const long INTERVAL = 10 * 60 * 1000;
+// Auto sleep timer
+long sleepPreviousMillis = 0;
+unsigned long sleepCurrentMillis = 0;
+const long SLEEP_INTERVAL = 10 * 60 * 1000;
 
-// Check battery interval
+// Battery timer
 long batteryPreviousMillis = 0;
 unsigned long batteryCurrentMillis = 0;
-const long BATTERY_INTERVAL = 60 * 1000;
+const long BATTERY_INTERVAL = 5 * 1000;
+
+// Low battery LED blink timer
+long ledPreviousMillis = 0;
+unsigned long ledCurrentMillis = 0;
+const long LED_INTERVAL = 5 * 1000;
+
+bool isLowBattery = false;
 
 // Function declaration
 void initKeys();
@@ -126,6 +133,7 @@ void loop() {
     while (bleKeyboard.isConnected()) {
         checkIdle();
         checkBattery();
+        showLowBatteryWarning();
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
             for (int c = 0; c < COLS; c++) {
@@ -272,8 +280,10 @@ void showBatteryState() {
     Serial.println(result);
     u8g2.sendBuffer();
 
-    if (batteryPercentage < 20) {
-        showLowBatteryWarning();
+    if (batteryPercentage <= 20) {
+        isLowBattery = true;
+    } else {
+        isLowBattery = false;
     }
 
     delay(100);
@@ -369,8 +379,8 @@ void goSleeping() {
  *
  */
 void checkIdle() {
-    currentMillis = millis();
-    if (currentMillis - previousMillis > INTERVAL) {
+    sleepCurrentMillis = millis();
+    if (sleepCurrentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
         goSleeping();
     }
 }
@@ -392,13 +402,30 @@ void checkBattery() {
  *
  */
 void showLowBatteryWarning() {
+    if (!isLowBattery) {
+        tp.DotStar_SetPower(false);
+        return;
+    }
     tp.DotStar_SetPower(true);
-    tp.DotStar_SetBrightness(5);
-    tp.DotStar_SetPixelColor(255, 0, 0);
+    ledCurrentMillis = millis();
+    if (ledCurrentMillis - ledPreviousMillis > 1000 &&
+        ledCurrentMillis - ledPreviousMillis <= 1200) {
+        tp.DotStar_SetBrightness(5);
+        tp.DotStar_SetPixelColor(255, 0, 0);
+    } else if (ledCurrentMillis - ledPreviousMillis > 1200 &&
+               ledCurrentMillis - ledPreviousMillis <= 1300) {
+        tp.DotStar_SetPixelColor(0, 0, 0);
+    } else if (ledCurrentMillis - ledPreviousMillis > 1300 &&
+               ledCurrentMillis - ledPreviousMillis <= 1500) {
+        tp.DotStar_SetPixelColor(255, 0, 0);
+    } else if (ledCurrentMillis - ledPreviousMillis > 1700) {
+        tp.DotStar_SetPixelColor(0, 0, 0);
+        ledPreviousMillis = ledCurrentMillis;
+    }
 }
 
 /**
- * Update previousMillis' value to reset idle timer
+ * Update sleepPreviousMillis' value to reset idle timer
  *
  */
-void resetIdle() { previousMillis = currentMillis; }
+void resetIdle() { sleepPreviousMillis = sleepCurrentMillis; }
