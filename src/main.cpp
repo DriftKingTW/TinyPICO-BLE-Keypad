@@ -51,6 +51,11 @@ long previousMillis = 0;
 unsigned long currentMillis = 0;
 const long INTERVAL = 10 * 60 * 1000;
 
+// Check battery interval
+long batteryPreviousMillis = 0;
+unsigned long batteryCurrentMillis = 0;
+const long BATTERY_INTERVAL = 60 * 1000;
+
 // Function declaration
 void initKeys();
 void goSleeping();
@@ -63,6 +68,7 @@ void showBatteryState();
 void breathLEDAnimation();
 float getBatteryVoltage();
 int getBatteryPercentage();
+void checkBattery();
 
 void setup() {
     Serial.begin(115200);
@@ -118,6 +124,7 @@ void loop() {
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
         checkIdle();
+        checkBattery();
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
             for (int c = 0; c < COLS; c++) {
@@ -360,6 +367,18 @@ void checkIdle() {
     currentMillis = millis();
     if (currentMillis - previousMillis > INTERVAL) {
         goSleeping();
+    }
+}
+
+/**
+ * Check battery status for a specified period
+ *
+ */
+void checkBattery() {
+    batteryCurrentMillis = millis();
+    if (batteryCurrentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
+        showBatteryState();
+        batteryPreviousMillis = batteryCurrentMillis;
     }
 }
 
