@@ -223,7 +223,7 @@ void keyRelease(Key &key) {
 }
 
 /**
- * Show battery state using onboard RGB LED
+ * Show battery state using onboard OLED display
  *
  */
 void showBatteryState() {
