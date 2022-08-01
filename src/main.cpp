@@ -68,6 +68,7 @@ void showBatteryState();
 void breathLEDAnimation();
 float getBatteryVoltage();
 int getBatteryPercentage();
+void showLowBatteryWarning();
 void checkBattery();
 
 void setup() {
@@ -271,6 +272,10 @@ void showBatteryState() {
     Serial.println(result);
     u8g2.sendBuffer();
 
+    if (batteryPercentage < 20) {
+        showLowBatteryWarning();
+    }
+
     delay(100);
 }
 
@@ -380,6 +385,16 @@ void checkBattery() {
         showBatteryState();
         batteryPreviousMillis = batteryCurrentMillis;
     }
+}
+
+/**
+ * Blink LED to indicate that battery is low
+ *
+ */
+void showLowBatteryWarning() {
+    tp.DotStar_SetPower(true);
+    tp.DotStar_SetBrightness(5);
+    tp.DotStar_SetPixelColor(255, 0, 0);
 }
 
 /**
