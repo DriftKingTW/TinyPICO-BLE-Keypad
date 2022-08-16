@@ -4,7 +4,7 @@
 
 1. Generate a JSON keyconfig file from: [TinyPICO BLE Keypad Configuration Tool](https://blog.driftking.tw/TinyPICO-BLE-Keypad-Key-Configuration-Tool/)
 
-2. Put key config files `keyconfig.json` into the `/data` directory.
+2. Put key config file `keyconfig.json` into the `/data` directory.
 
 3. Run `sh ./upload_config.sh`
 
