@@ -2,7 +2,7 @@
 
 ## Usage
 
-1. Generate a JSON keyconfig file from here: [TinyPICO BLE Keypad Configuration Tool](https://blog.driftking.tw/TinyPICO-BLE-Keypad-Key-Configuration-Tool/)
+1. Generate a JSON keyconfig file from: [TinyPICO BLE Keypad Configuration Tool](https://blog.driftking.tw/TinyPICO-BLE-Keypad-Key-Configuration-Tool/)
 
 2. Put key config files `keyconfig.json` into the `/data` directory.
 
