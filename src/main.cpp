@@ -22,6 +22,10 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 TinyPICO tp = TinyPICO();
 
+TaskHandle_t Task0;
+
+RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
+
 // Stucture for key stroke
 struct Key {
     uint8_t keyStroke;
@@ -37,6 +41,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
+String currentKeyInfo = "";
 byte currentLayoutIndex = 0;
 byte layoutLength = 0;
 const short jsonDocSize = 4096;
@@ -64,6 +69,7 @@ const long LED_INTERVAL = 5 * 1000;
 bool isLowBattery = false;
 
 // Function declaration
+void coreZeroTask(void *);
 void initKeys();
 void goSleeping();
 void checkIdle();
@@ -79,10 +85,10 @@ void showLowBatteryWarning();
 void checkBattery();
 
 void setup() {
+    setCpuFrequencyMhz(80);
     Serial.begin(115200);
 
-    Serial.println("Set CPU clock speed to 80Mhz to reduce power consumption");
-    setCpuFrequencyMhz(80);
+    Serial.println("CPU clock speed set to 80Mhz");
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
@@ -115,14 +121,44 @@ void setup() {
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
 
+    Serial.println("Configuring CPU core 0's task...");
+    xTaskCreatePinnedToCore(
+        coreZeroTask,    /* Task function. */
+        "SecondaryTask", /* name of task. */
+        10000,           /* Stack size of task */
+        NULL,            /* parameter of the task */
+        1,               /* priority of the task */
+        &Task0,          /* Task handle to keep track of created task */
+        0);              /* pin task to core 0 */
+
     Serial.println("Setup finished!");
 }
 
+// coreZeroTask: Check battery status every 5 seconds
+void coreZeroTask(void *pvParameters) {
+    Serial.println((String) "Secondary Task running on core " +
+                   xPortGetCoreID());
+
+    int previousMillis = millis();
+
+    while (true) {
+        checkIdle();
+        checkBattery();
+        showLowBatteryWarning();
+        if (millis() - previousMillis > 1000) {
+            timeSinceBoot++;
+            previousMillis = millis();
+        }
+        delay(100);
+    }
+}
+
 void loop() {
+    Serial.println((String) "Keyboard scan running on core " +
+                   xPortGetCoreID());
+
     renderScreen("Connecting..");
     breathLEDAnimation();
-
-    checkIdle();
 
     if (bleKeyboard.isConnected()) {
         renderScreen("= Connected =");
@@ -131,9 +167,6 @@ void loop() {
 
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
-        checkIdle();
-        checkBattery();
-        showLowBatteryWarning();
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
             for (int c = 0; c < COLS; c++) {
@@ -222,7 +255,10 @@ void keyPress(Key &key) {
         bleKeyboard.press(key.keyStroke);
     }
     key.state = true;
-    renderScreen(key.keyInfo);
+    if (currentKeyInfo != "key.keyInfo") {
+        renderScreen(key.keyInfo);
+        currentKeyInfo = key.keyInfo;
+    }
 }
 
 /**
@@ -235,6 +271,7 @@ void keyRelease(Key &key) {
         bleKeyboard.release(key.keyStroke);
     }
     key.state = false;
+    currentKeyInfo = "";
     return;
 }
 
@@ -285,8 +322,6 @@ void showBatteryState() {
     } else {
         isLowBattery = false;
     }
-
-    delay(100);
 }
 
 /**
@@ -393,6 +428,8 @@ void checkBattery() {
     batteryCurrentMillis = millis();
     if (batteryCurrentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
         showBatteryState();
+        Serial.println((String) "Time since boot: " + timeSinceBoot +
+                       " seconds");
         batteryPreviousMillis = batteryCurrentMillis;
     }
 }
