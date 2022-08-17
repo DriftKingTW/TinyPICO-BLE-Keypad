@@ -25,6 +25,7 @@ TinyPICO tp = TinyPICO();
 TaskHandle_t Task0;
 
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
+RTC_DATA_ATTR unsigned int savedLayout = 0;
 
 // Stucture for key stroke
 struct Key {
@@ -85,16 +86,26 @@ void showLowBatteryWarning();
 void checkBattery();
 
 void setup() {
-    setCpuFrequencyMhz(80);
     Serial.begin(115200);
-
-    Serial.println("CPU clock speed set to 80Mhz");
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
+
+    Serial.println("Configuring ext1 wakeup source...");
+    esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+    Serial.println("Configuring CPU core 0's task...");
+    xTaskCreatePinnedToCore(
+        coreZeroTask,    /* Task function. */
+        "SecondaryTask", /* name of task. */
+        10000,           /* Stack size of task */
+        NULL,            /* parameter of the task */
+        1,               /* priority of the task */
+        &Task0,          /* Task handle to keep track of created task */
+        0);              /* pin task to core 0 */
 
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
@@ -117,19 +128,6 @@ void setup() {
     Serial.println("Configuring input pin...");
     currentLayoutIndex = 1;
     initKeys();
-
-    Serial.println("Configuring ext1 wakeup source...");
-    esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
-
-    Serial.println("Configuring CPU core 0's task...");
-    xTaskCreatePinnedToCore(
-        coreZeroTask,    /* Task function. */
-        "SecondaryTask", /* name of task. */
-        10000,           /* Stack size of task */
-        NULL,            /* parameter of the task */
-        1,               /* priority of the task */
-        &Task0,          /* Task handle to keep track of created task */
-        0);              /* pin task to core 0 */
 
     Serial.println("Setup finished!");
 }
@@ -180,7 +178,7 @@ void loop() {
                             currentLayoutIndex = 0;
                         }
                         initKeys();
-                        delay(500);
+                        delay(300);
                     } else {  // Standard key press
                         keyPress(keyMap[r][c]);
                         resetIdle();
@@ -201,6 +199,10 @@ void loop() {
  *
  */
 void initKeys() {
+    Serial.begin(115200);
+    setCpuFrequencyMhz(240);
+
+    Serial.println("CPU clock speed set to 240Mhz");
     Serial.println("Reading JSON keymap configuration...");
 
     DynamicJsonDocument doc(jsonDocSize);
@@ -241,6 +243,10 @@ void initKeys() {
     // Show layout title on screen
     String layoutStr = doc[currentLayoutIndex]["title"];
     renderScreen("Layout: " + layoutStr);
+
+    Serial.begin(115200);
+    setCpuFrequencyMhz(80);
+    Serial.println("CPU clock speed set to 80Mhz");
 }
 
 /**
