@@ -173,8 +173,6 @@ void loop() {
                 if (digitalRead(inputs[c]) == ACTIVE) {
                     if (r == 1 && c == 0) {  // Enter deep sleep mode
                         goSleeping();
-                    } else if (r == 4 && c == 1) {  // Show battery level
-                        showBatteryState();
                     } else if (r == 4 && c == 0) {  // Switch layout
                         if (currentLayoutIndex < layoutLength - 1) {
                             currentLayoutIndex++;
