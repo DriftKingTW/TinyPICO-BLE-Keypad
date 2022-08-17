@@ -445,7 +445,9 @@ void checkBattery() {
  */
 void showLowBatteryWarning() {
     if (!isLowBattery) {
-        tp.DotStar_SetPower(false);
+        if (bleKeyboard.isConnected()) {
+            tp.DotStar_SetPower(false);
+        }
         return;
     }
     tp.DotStar_SetPower(true);
