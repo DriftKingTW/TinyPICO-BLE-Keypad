@@ -25,7 +25,7 @@ TinyPICO tp = TinyPICO();
 TaskHandle_t Task0;
 
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
-RTC_DATA_ATTR unsigned int savedLayout = 0;
+RTC_DATA_ATTR unsigned int savedLayoutIndex = 0;
 
 // Stucture for key stroke
 struct Key {
@@ -126,7 +126,7 @@ void setup() {
     file.close();
 
     Serial.println("Configuring input pin...");
-    currentLayoutIndex = 1;
+    currentLayoutIndex = savedLayoutIndex;
     initKeys();
 
     Serial.println("Setup finished!");
@@ -177,6 +177,7 @@ void loop() {
                         } else {
                             currentLayoutIndex = 0;
                         }
+                        savedLayoutIndex = currentLayoutIndex;
                         initKeys();
                         delay(300);
                     } else {  // Standard key press
