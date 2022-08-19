@@ -4,9 +4,11 @@
 #include <SPIFFS.h>
 #include <TinyPICO.h>
 #include <U8g2lib.h>
+#include <WiFi.h>
 
 #include <cstring>
 #include <fstream>
+#include <web-server.hpp>
 
 #define BLE_NAME "TinyPICO BLE"
 #define AUTHOR "DriftKingTW"
@@ -26,6 +28,7 @@ TaskHandle_t Task0;
 
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR unsigned int savedLayoutIndex = 0;
+RTC_DATA_ATTR bool bootConfigMode = false;
 
 // Stucture for key stroke
 struct Key {
@@ -70,9 +73,11 @@ const long LED_INTERVAL = 5 * 1000;
 bool isLowBattery = false;
 
 // Function declaration
-void coreZeroTask(void *);
+void generalStatusCheckTask(void *);
+void webServer(void *);
 void initKeys();
 void goSleeping();
+void switchBootMode();
 void checkIdle();
 void resetIdle();
 void renderScreen(String msg);
@@ -97,15 +102,21 @@ void setup() {
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-    Serial.println("Configuring CPU core 0's task...");
+    Serial.println("Configuring General Status Check Task on CPU core 0...");
     xTaskCreatePinnedToCore(
-        coreZeroTask,    /* Task function. */
-        "SecondaryTask", /* name of task. */
-        10000,           /* Stack size of task */
-        NULL,            /* parameter of the task */
-        1,               /* priority of the task */
-        &Task0,          /* Task handle to keep track of created task */
-        0);              /* pin task to core 0 */
+        generalStatusCheckTask,   /* Task function. */
+        "GeneralStatusCheckTask", /* name of task. */
+        10000,                    /* Stack size of task */
+        NULL,                     /* parameter of the task */
+        0,                        /* priority of the task */
+        &Task0, /* Task handle to keep track of created task */
+        0);     /* pin task to core 0 */
+
+    if (bootConfigMode == true) {
+        Serial.println("Booting in update config mode...");
+        initWebServer();
+        Serial.println((String) "IP: " + WiFi.softAPIP().toString().c_str());
+    }
 
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
@@ -132,29 +143,23 @@ void setup() {
     Serial.println("Setup finished!");
 }
 
-// coreZeroTask: Check battery status every 5 seconds
-void coreZeroTask(void *pvParameters) {
-    Serial.println((String) "Secondary Task running on core " +
-                   xPortGetCoreID());
-
+void generalStatusCheckTask(void *pvParameters) {
     int previousMillis = millis();
 
     while (true) {
         checkIdle();
-        checkBattery();
+        // Temporarily disabled because of its' blocking CPU0's task
+        // checkBattery();
         showLowBatteryWarning();
         if (millis() - previousMillis > 1000) {
             timeSinceBoot++;
             previousMillis = millis();
         }
-        delay(100);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
 void loop() {
-    Serial.println((String) "Keyboard scan running on core " +
-                   xPortGetCoreID());
-
     renderScreen("Connecting..");
     breathLEDAnimation();
 
@@ -171,6 +176,8 @@ void loop() {
                 if (digitalRead(inputs[c]) == ACTIVE) {
                     if (r == 1 && c == 0) {  // Enter deep sleep mode
                         goSleeping();
+                    } else if (r == 0 && c == 0) {
+                        switchBootMode();
                     } else if (r == 4 && c == 0) {  // Switch layout
                         if (currentLayoutIndex < layoutLength - 1) {
                             currentLayoutIndex++;
@@ -362,7 +369,18 @@ void renderScreen(String msg) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
-    u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 16, char_array);
+    if (bootConfigMode) {
+        u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 10, char_array);
+        String ip_str =
+            (String) "Web UI: " + WiFi.softAPIP().toString().c_str();
+        int n = ip_str.length();
+        char ip_char_array[n + 1];
+        strcpy(ip_char_array, ip_str.c_str());
+        u8g2.drawStr(64 - u8g2.getStrWidth(ip_char_array) / 2, 22,
+                     ip_char_array);
+    } else {
+        u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 16, char_array);
+    }
     u8g2.sendBuffer();
 }
 
@@ -414,8 +432,25 @@ void goSleeping() {
 }
 
 /**
- * Check if device is idle for a specified period to determine if it should go
- * to sleep or not.
+ * Switching between different boot modes
+ *
+ */
+void switchBootMode() {
+    Serial.println("Resetting...");
+    if (!bootConfigMode) {
+        renderScreen("=> Config Mode <=");
+    } else {
+        renderScreen("=> Normal Mode <=");
+        WiFi.softAPdisconnect(true);
+    }
+    bootConfigMode = !bootConfigMode;
+    esp_sleep_enable_timer_wakeup(100);
+    esp_deep_sleep_start();
+}
+
+/**
+ * Check if device is idle for a specified period to determine if it should
+ * go to sleep or not.
  *
  */
 void checkIdle() {
