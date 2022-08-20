@@ -56,19 +56,18 @@ byte outputs[] = {4, 14, 15, 27, 26};  // row
 const int outputCount = sizeof(outputs) / sizeof(outputs[0]);
 
 // Auto sleep timer
-long sleepPreviousMillis = 0;
-unsigned long sleepCurrentMillis = 0;
+unsigned long sleepPreviousMillis = 0;
 const long SLEEP_INTERVAL = 10 * 60 * 1000;
 
 // Battery timer
-long batteryPreviousMillis = 0;
-unsigned long batteryCurrentMillis = 0;
+unsigned long batteryPreviousMillis = 0;
 const long BATTERY_INTERVAL = 5 * 1000;
 
 // Low battery LED blink timer
-long ledPreviousMillis = 0;
-unsigned long ledCurrentMillis = 0;
+unsigned long ledPreviousMillis = 0;
 const long LED_INTERVAL = 5 * 1000;
+
+unsigned long currentMillis = 0;
 
 bool isLowBattery = false;
 int batteryPercentage = 101;
@@ -104,18 +103,17 @@ void setup() {
         Serial.println("Booting in update config mode...");
         initWebServer();
         Serial.println((String) "IP: " + WiFi.softAPIP().toString().c_str());
-    } else {
-        Serial.println(
-            "Configuring General Status Check Task on CPU core 0...");
-        xTaskCreatePinnedToCore(
-            generalStatusCheckTask,   /* Task function. */
-            "GeneralStatusCheckTask", /* name of task. */
-            10000,                    /* Stack size of task */
-            NULL,                     /* parameter of the task */
-            0,                        /* priority of the task */
-            &Task0, /* Task handle to keep track of created task */
-            0);     /* pin task to core 0 */
     }
+
+    Serial.println("Configuring General Status Check Task on CPU core 0...");
+    xTaskCreatePinnedToCore(
+        generalStatusCheckTask,   /* Task function. */
+        "GeneralStatusCheckTask", /* name of task. */
+        1000,                    /* Stack size of task */
+        NULL,                     /* parameter of the task */
+        0,                        /* priority of the task */
+        &Task0, /* Task handle to keep track of created task */
+        0);     /* pin task to core 0 */
 
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
@@ -143,19 +141,20 @@ void setup() {
 }
 
 void generalStatusCheckTask(void *pvParameters) {
-    int previousMillis = millis();
+    int previousMillis = 0;
 
     while (true) {
+        currentMillis = millis();
+        // checkBattery();
         checkIdle();
         showLowBatteryWarning();
-        // checkBattery();
-        if (millis() - previousMillis > 1000) {
+        if (currentMillis - previousMillis > 1000) {
             timeSinceBoot++;
-            previousMillis = millis();
+            previousMillis = currentMillis;
             Serial.println((String) "Time since boot: " + timeSinceBoot +
                            " seconds");
         }
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -200,6 +199,7 @@ void loop() {
             delayMicroseconds(10);
         }
     }
+    delay(100);
 }
 
 /**
@@ -433,8 +433,7 @@ void switchBootMode() {
  *
  */
 void checkIdle() {
-    sleepCurrentMillis = millis();
-    if (sleepCurrentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
+    if (currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
         goSleeping();
     }
 }
@@ -444,11 +443,11 @@ void checkIdle() {
  *
  */
 void checkBattery() {
-    batteryCurrentMillis = millis();
-    if (batteryCurrentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
+    if (currentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
         batteryPercentage = getBatteryPercentage();
-        batteryPreviousMillis = batteryCurrentMillis;
+        batteryPreviousMillis = currentMillis;
     }
+    return;
 }
 
 /**
@@ -463,20 +462,19 @@ void showLowBatteryWarning() {
         return;
     }
     tp.DotStar_SetPower(true);
-    ledCurrentMillis = millis();
-    if (ledCurrentMillis - ledPreviousMillis > 1000 &&
-        ledCurrentMillis - ledPreviousMillis <= 1200) {
+    if (currentMillis - ledPreviousMillis > 1000 &&
+        currentMillis - ledPreviousMillis <= 1200) {
         tp.DotStar_SetBrightness(5);
         tp.DotStar_SetPixelColor(255, 0, 0);
-    } else if (ledCurrentMillis - ledPreviousMillis > 1200 &&
-               ledCurrentMillis - ledPreviousMillis <= 1300) {
+    } else if (currentMillis - ledPreviousMillis > 1200 &&
+               currentMillis - ledPreviousMillis <= 1300) {
         tp.DotStar_SetPixelColor(0, 0, 0);
-    } else if (ledCurrentMillis - ledPreviousMillis > 1300 &&
-               ledCurrentMillis - ledPreviousMillis <= 1500) {
+    } else if (currentMillis - ledPreviousMillis > 1300 &&
+               currentMillis - ledPreviousMillis <= 1500) {
         tp.DotStar_SetPixelColor(255, 0, 0);
-    } else if (ledCurrentMillis - ledPreviousMillis > 1700) {
+    } else if (currentMillis - ledPreviousMillis > 1700) {
         tp.DotStar_SetPixelColor(0, 0, 0);
-        ledPreviousMillis = ledCurrentMillis;
+        ledPreviousMillis = currentMillis;
     }
 }
 
@@ -484,4 +482,4 @@ void showLowBatteryWarning() {
  * Update sleepPreviousMillis' value to reset idle timer
  *
  */
-void resetIdle() { sleepPreviousMillis = sleepCurrentMillis; }
+void resetIdle() { sleepPreviousMillis = currentMillis; }
