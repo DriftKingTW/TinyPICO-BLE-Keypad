@@ -24,7 +24,8 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 TinyPICO tp = TinyPICO();
 
-TaskHandle_t Task0;
+TaskHandle_t TaskGeneralStatusCheck;
+TaskHandle_t TaskLED;
 
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR unsigned int savedLayoutIndex = 0;
@@ -73,6 +74,7 @@ bool isLowBattery = false;
 int batteryPercentage = 101;
 
 // Function declaration
+void ledTask(void *);
 void generalStatusCheckTask(void *);
 void initKeys();
 void goSleeping();
@@ -111,9 +113,18 @@ void setup() {
         "GeneralStatusCheckTask", /* name of task. */
         1000,                     /* Stack size of task */
         NULL,                     /* parameter of the task */
-        0,                        /* priority of the task */
-        &Task0, /* Task handle to keep track of created task */
-        0);     /* pin task to core 0 */
+        1,                        /* priority of the task */
+        &TaskGeneralStatusCheck, /* Task handle to keep track of created task */
+        0);                      /* pin task to core 0 */
+
+    xTaskCreatePinnedToCore(
+        ledTask,    /* Task function. */
+        "LED Task", /* name of task. */
+        1000,       /* Stack size of task */
+        NULL,       /* parameter of the task */
+        1,          /* priority of the task */
+        &TaskLED,   /* Task handle to keep track of created task */
+        0);         /* pin task to core 0 */
 
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
@@ -140,16 +151,22 @@ void setup() {
     Serial.println("Setup finished!");
 }
 
+void ledTask(void *pvParameters) {
+    while (true) {
+        currentMillis = millis();
+        showLowBatteryWarning();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
 void generalStatusCheckTask(void *pvParameters) {
     int previousMillis = 0;
 
     while (true) {
-        currentMillis = millis();
-        // checkBattery();
         checkIdle();
-        showLowBatteryWarning();
-        if (currentMillis - previousMillis > 1000) {
-            timeSinceBoot++;
+        // checkBattery();
+        if (currentMillis - previousMillis > 5000) {
+            timeSinceBoot += (currentMillis - previousMillis) / 1000;
             previousMillis = currentMillis;
             Serial.println((String) "Time since boot: " + timeSinceBoot +
                            " seconds");
@@ -197,6 +214,9 @@ void loop() {
             }
             digitalWrite(outputs[r], HIGH);  // Setting the row back to high
             delayMicroseconds(10);
+        }
+        if (bootConfigMode) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     }
     delay(100);

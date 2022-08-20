@@ -87,6 +87,7 @@ void initWebServer() {
     // }
 
     // Configure soft AP
+    WiFi.mode(WIFI_AP);
     WiFi.softAP(config.ssid.c_str(), config.wifipassword.c_str());
 
     // Serial.println("\n\nNetwork Configuration:");
