@@ -109,7 +109,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         generalStatusCheckTask,   /* Task function. */
         "GeneralStatusCheckTask", /* name of task. */
-        1000,                    /* Stack size of task */
+        1000,                     /* Stack size of task */
         NULL,                     /* parameter of the task */
         0,                        /* priority of the task */
         &Task0, /* Task handle to keep track of created task */
@@ -320,7 +320,7 @@ void renderScreen(String msg) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
-    u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 22, char_array);
+    u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 24, char_array);
     if (bootConfigMode) {
         String ip_str =
             (String) "Web UI: " + WiFi.softAPIP().toString().c_str();
