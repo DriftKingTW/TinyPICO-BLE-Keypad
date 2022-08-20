@@ -331,34 +331,35 @@ void renderScreen(String msg) {
                      ip_char_array);
     } else {
         String result = "";
-        char *batteryIcon = "\u005A";
         bool plugged = digitalRead(9);
         bool charging = tp.IsChargingBattery();
+        u8g2.setFontPosCenter();
+        u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
         if (plugged && charging) {
             result = "Charging";
-            batteryIcon = "\u0060";
+            u8g2.drawStr((64 - u8g2.getStrWidth("\u0060") / 2) - 32, 10,
+                         "\u0060");
         } else if (plugged) {
             result = "Plugged in";
-            batteryIcon = "\u0060";
+            u8g2.drawStr((64 - u8g2.getStrWidth("\u0060") / 2) - 32, 10,
+                         "\u0060");
         } else {
-            result = "Bat. " + String(batteryPercentage) + "%";
+            result = (String)batteryPercentage + "%";
             if (batteryPercentage > 75) {
-                batteryIcon = "\u005B";
+                u8g2.drawStr((64 - u8g2.getStrWidth("\u005B") / 2) - 32, 10,
+                             "\u005B");
             } else if (batteryPercentage > 50) {
-                batteryIcon = "\u005A";
+                u8g2.drawStr((64 - u8g2.getStrWidth("\u005A") / 2) - 32, 10,
+                             "\u005A");
             } else if (batteryPercentage > 25) {
-                batteryIcon = "\u005A";
+                u8g2.drawStr((64 - u8g2.getStrWidth("\u005A") / 2) - 32, 10,
+                             "\u005A");
             }
         }
 
         int n = result.length();
         char char_array[n];
         strcpy(char_array, result.c_str());
-
-        u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
-        u8g2.setFontPosCenter();
-        u8g2.drawStr((64 - u8g2.getStrWidth(batteryIcon) / 2) - 32, 10,
-                     batteryIcon);
         u8g2.setFont(u8g2_font_ncenB08_tr);
         u8g2.setFontPosCenter();
         u8g2.drawStr((64 - u8g2.getStrWidth(char_array) / 2) + 8, 10,
