@@ -132,6 +132,7 @@ void initWebServer() {
     Serial.println("Starting Webserver ...");
     server->begin();
 }
+
 void rebootESP(String message) {
     Serial.print("Rebooting ESP32: ");
     Serial.println(message);

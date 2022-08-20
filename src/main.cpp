@@ -71,10 +71,10 @@ unsigned long ledCurrentMillis = 0;
 const long LED_INTERVAL = 5 * 1000;
 
 bool isLowBattery = false;
+int batteryPercentage = 101;
 
 // Function declaration
 void generalStatusCheckTask(void *);
-void webServer(void *);
 void initKeys();
 void goSleeping();
 void switchBootMode();
@@ -83,9 +83,7 @@ void resetIdle();
 void renderScreen(String msg);
 void keyPress(Key &key);
 void keyRelease(Key &key);
-void showBatteryState();
 void breathLEDAnimation();
-float getBatteryVoltage();
 int getBatteryPercentage();
 void showLowBatteryWarning();
 void checkBattery();
@@ -102,20 +100,21 @@ void setup() {
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-    Serial.println("Configuring General Status Check Task on CPU core 0...");
-    xTaskCreatePinnedToCore(
-        generalStatusCheckTask,   /* Task function. */
-        "GeneralStatusCheckTask", /* name of task. */
-        10000,                    /* Stack size of task */
-        NULL,                     /* parameter of the task */
-        0,                        /* priority of the task */
-        &Task0, /* Task handle to keep track of created task */
-        0);     /* pin task to core 0 */
-
     if (bootConfigMode == true) {
         Serial.println("Booting in update config mode...");
         initWebServer();
         Serial.println((String) "IP: " + WiFi.softAPIP().toString().c_str());
+    } else {
+        Serial.println(
+            "Configuring General Status Check Task on CPU core 0...");
+        xTaskCreatePinnedToCore(
+            generalStatusCheckTask,   /* Task function. */
+            "GeneralStatusCheckTask", /* name of task. */
+            10000,                    /* Stack size of task */
+            NULL,                     /* parameter of the task */
+            0,                        /* priority of the task */
+            &Task0, /* Task handle to keep track of created task */
+            0);     /* pin task to core 0 */
     }
 
     if (!SPIFFS.begin(true)) {
@@ -148,12 +147,13 @@ void generalStatusCheckTask(void *pvParameters) {
 
     while (true) {
         checkIdle();
-        // Temporarily disabled because of its' blocking CPU0's task
-        // checkBattery();
         showLowBatteryWarning();
+        // checkBattery();
         if (millis() - previousMillis > 1000) {
             timeSinceBoot++;
             previousMillis = millis();
+            Serial.println((String) "Time since boot: " + timeSinceBoot +
+                           " seconds");
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
@@ -288,55 +288,6 @@ void keyRelease(Key &key) {
 }
 
 /**
- * Show battery state using onboard OLED display
- *
- */
-void showBatteryState() {
-    String result = "";
-    char *batteryIcon = "\u005A";
-    bool plugged = digitalRead(9);
-    bool charging = tp.IsChargingBattery();
-    int batteryPercentage = getBatteryPercentage();
-    if (plugged && charging) {
-        result = "Charging";
-        batteryIcon = "\u0060";
-    } else if (plugged) {
-        result = "Plugged in";
-        batteryIcon = "\u0060";
-    } else {
-        result = "Bat. " + String(batteryPercentage) + "%";
-        if (batteryPercentage > 75) {
-            batteryIcon = "\u005B";
-        } else if (batteryPercentage > 50) {
-            batteryIcon = "\u005A";
-        } else if (batteryPercentage > 25) {
-            batteryIcon = "\u005A";
-        }
-    }
-
-    int n = result.length();
-    char char_array[n];
-    strcpy(char_array, result.c_str());
-
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
-    u8g2.setFontPosCenter();
-    u8g2.drawStr((64 - u8g2.getStrWidth(batteryIcon) / 2) - 32, 16,
-                 batteryIcon);
-    u8g2.setFont(u8g2_font_ncenB08_tr);
-    u8g2.setFontPosCenter();
-    u8g2.drawStr((64 - u8g2.getStrWidth(char_array) / 2) + 8, 16, char_array);
-    Serial.println(result);
-    u8g2.sendBuffer();
-
-    if (batteryPercentage <= 20) {
-        isLowBattery = true;
-    } else {
-        isLowBattery = false;
-    }
-}
-
-/**
  * Breath LED Animation
  *
  */
@@ -369,26 +320,59 @@ void renderScreen(String msg) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
+    u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 22, char_array);
     if (bootConfigMode) {
-        u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 10, char_array);
         String ip_str =
             (String) "Web UI: " + WiFi.softAPIP().toString().c_str();
         int n = ip_str.length();
         char ip_char_array[n + 1];
         strcpy(ip_char_array, ip_str.c_str());
-        u8g2.drawStr(64 - u8g2.getStrWidth(ip_char_array) / 2, 22,
+        u8g2.drawStr(64 - u8g2.getStrWidth(ip_char_array) / 2, 10,
                      ip_char_array);
     } else {
-        u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 16, char_array);
+        String result = "";
+        char *batteryIcon = "\u005A";
+        bool plugged = digitalRead(9);
+        bool charging = tp.IsChargingBattery();
+        if (plugged && charging) {
+            result = "Charging";
+            batteryIcon = "\u0060";
+        } else if (plugged) {
+            result = "Plugged in";
+            batteryIcon = "\u0060";
+        } else {
+            result = "Bat. " + String(batteryPercentage) + "%";
+            if (batteryPercentage > 75) {
+                batteryIcon = "\u005B";
+            } else if (batteryPercentage > 50) {
+                batteryIcon = "\u005A";
+            } else if (batteryPercentage > 25) {
+                batteryIcon = "\u005A";
+            }
+        }
+
+        int n = result.length();
+        char char_array[n];
+        strcpy(char_array, result.c_str());
+
+        u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
+        u8g2.setFontPosCenter();
+        u8g2.drawStr((64 - u8g2.getStrWidth(batteryIcon) / 2) - 32, 10,
+                     batteryIcon);
+        u8g2.setFont(u8g2_font_ncenB08_tr);
+        u8g2.setFontPosCenter();
+        u8g2.drawStr((64 - u8g2.getStrWidth(char_array) / 2) + 8, 10,
+                     char_array);
+        u8g2.sendBuffer();
+
+        if (batteryPercentage <= 20) {
+            isLowBattery = true;
+        } else {
+            isLowBattery = false;
+        }
     }
     u8g2.sendBuffer();
 }
-
-/**
- * Return Battery Current Voltage
- *
- */
-float getBatteryVoltage() { return tp.GetBatteryVoltage(); }
 
 /**
  * Return Battery Current Percentage
@@ -398,14 +382,9 @@ int getBatteryPercentage() {
     const float minVoltage = 3.4, fullVolatge = 4.0;
     // Get average battery voltage value from 10 time periods for more stable
     // result
-    float batteryVoltage = 0;
-    for (int i = 0; i < 100; i++) {
-        batteryVoltage += getBatteryVoltage();
-        delayMicroseconds(1);
-    }
-    batteryVoltage /= 100.0;
+    float batteryVoltage = tp.GetBatteryVoltage();
 
-    Serial.println(batteryVoltage);
+    Serial.println((String) "Battery Voltage: " + batteryVoltage);
 
     // Convert to percentage
     float percentage =
@@ -467,9 +446,7 @@ void checkIdle() {
 void checkBattery() {
     batteryCurrentMillis = millis();
     if (batteryCurrentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
-        showBatteryState();
-        Serial.println((String) "Time since boot: " + timeSinceBoot +
-                       " seconds");
+        batteryPercentage = getBatteryPercentage();
         batteryPreviousMillis = batteryCurrentMillis;
     }
 }
