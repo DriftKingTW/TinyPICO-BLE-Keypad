@@ -8,7 +8,10 @@
 
 #include <cstring>
 #include <fstream>
-#include <web-server.hpp>
+// #include <web-server.hpp>
+#include <WebServer.h>
+
+#include <helper.hpp>
 
 #define BLE_NAME "TinyPICO BLE"
 #define AUTHOR "DriftKingTW"
@@ -26,6 +29,7 @@ TinyPICO tp = TinyPICO();
 
 TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
+TaskHandle_t TaskNetwork;
 
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR unsigned int savedLayoutIndex = 0;
@@ -76,6 +80,9 @@ int batteryPercentage = 101;
 // Function declaration
 void ledTask(void *);
 void generalStatusCheckTask(void *);
+void networkTask(void *);
+void handleRoot();
+void handleNotFound();
 void initKeys();
 void goSleeping();
 void switchBootMode();
@@ -89,6 +96,13 @@ int getBatteryPercentage();
 void showLowBatteryWarning();
 void checkBattery();
 
+// Replace with your network credentials
+const char *ssid = "TP-Link_6060";
+const char *password = "10220328";
+
+// Set web server port number to 80
+WebServer server(80);
+
 void setup() {
     Serial.begin(115200);
 
@@ -101,21 +115,16 @@ void setup() {
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-    if (bootConfigMode == true) {
-        Serial.println("Booting in update config mode...");
-        initWebServer();
-        Serial.println((String) "IP: " + WiFi.softAPIP().toString().c_str());
-    }
-
     Serial.println("Configuring General Status Check Task on CPU core 0...");
     xTaskCreatePinnedToCore(
         generalStatusCheckTask,   /* Task function. */
         "GeneralStatusCheckTask", /* name of task. */
-        1000,                     /* Stack size of task */
+        5000,                     /* Stack size of task */
         NULL,                     /* parameter of the task */
         1,                        /* priority of the task */
         &TaskGeneralStatusCheck, /* Task handle to keep track of created task */
         0);                      /* pin task to core 0 */
+    Serial.println("General Status Check Task started");
 
     xTaskCreatePinnedToCore(
         ledTask,    /* Task function. */
@@ -125,11 +134,23 @@ void setup() {
         1,          /* priority of the task */
         &TaskLED,   /* Task handle to keep track of created task */
         0);         /* pin task to core 0 */
+    Serial.println("LED Task started");
 
+    Serial.println("\n\nLoading SPIFFS...");
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
         return;
     }
+
+    Serial.print("SPIFFS Free: ");
+    Serial.println(
+        humanReadableSize((SPIFFS.totalBytes() - SPIFFS.usedBytes())));
+    Serial.print("SPIFFS Used: ");
+    Serial.println(humanReadableSize(SPIFFS.usedBytes()));
+    Serial.print("SPIFFS Total: ");
+    Serial.println(humanReadableSize(SPIFFS.totalBytes()));
+
+    Serial.println(listFiles());
 
     Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
     File file = SPIFFS.open("/keyconfig.json");
@@ -149,6 +170,67 @@ void setup() {
     initKeys();
 
     Serial.println("Setup finished!");
+
+    if (bootConfigMode) {
+        Serial.println("Booting in update config mode...");
+
+        Serial.println("Loading \"wifi.json\" from SPIFFS...");
+        File file = SPIFFS.open("/wifi.json");
+        if (!file) {
+            Serial.println("Failed to open file for reading");
+            return;
+        }
+
+        Serial.println("Reading WIFI configuration from \"wifi.json\"...");
+        String wifiConfigJSON = "";
+        while (file.available()) {
+            wifiConfigJSON += (char)file.read();
+        }
+        file.close();
+
+        DynamicJsonDocument doc(jsonDocSize);
+        DeserializationError err = deserializeJson(
+            doc, wifiConfigJSON, DeserializationOption::NestingLimit(5));
+        if (err) {
+            Serial.print(F("deserializeJson() failed: "));
+            Serial.println(err.c_str());
+        }
+
+        const char *ssid = doc["ssid"];
+        const char *password = doc["password"];
+
+        WiFi.mode(WIFI_AP);
+        // Connect to Wi-Fi network with SSID and password
+        renderScreen("Connecting to WiFi..");
+        Serial.print("Connecting to ");
+        Serial.println(ssid);
+        WiFi.begin(ssid, password);
+        while (WiFi.status() != WL_CONNECTED) {
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println((String)ssid + "Connected!");
+        Serial.println((String) "IP: " + WiFi.localIP().toString().c_str());
+        server.on("/", handleRoot);
+
+        server.on("/inline", []() {
+            server.send(200, "text/plain", "this works as well");
+        });
+
+        server.onNotFound(handleNotFound);
+
+        server.begin();
+        Serial.println("HTTP server started");
+
+        xTaskCreate(networkTask,    /* Task function. */
+                    "Network Task", /* name of task. */
+                    10000,          /* Stack size of task */
+                    NULL,           /* parameter of the task */
+                    1,              /* priority of the task */
+                    &TaskNetwork /* Task handle to keep track of created task */
+        );                       /* pin task to core 0 */
+        Serial.println("Network service started");
+    }
 }
 
 void ledTask(void *pvParameters) {
@@ -164,7 +246,7 @@ void generalStatusCheckTask(void *pvParameters) {
 
     while (true) {
         checkIdle();
-        // checkBattery();
+        checkBattery();
         if (currentMillis - previousMillis > 5000) {
             timeSinceBoot += (currentMillis - previousMillis) / 1000;
             previousMillis = currentMillis;
@@ -175,8 +257,15 @@ void generalStatusCheckTask(void *pvParameters) {
     }
 }
 
+void networkTask(void *pvParameters) {
+    while (true) {
+        server.handleClient();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
 void loop() {
-    renderScreen("Connecting..");
+    renderScreen("Connecting BLE..");
     breathLEDAnimation();
 
     if (bleKeyboard.isConnected()) {
@@ -215,12 +304,14 @@ void loop() {
             digitalWrite(outputs[r], HIGH);  // Setting the row back to high
             delayMicroseconds(10);
         }
-        if (bootConfigMode) {
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-        }
+        delay(10);
     }
     delay(100);
 }
+
+void handleRoot() { server.send(200, "text/plain", "hello from esp32!"); }
+
+void handleNotFound() { server.send(404, "text/plain", "Not found"); }
 
 /**
  * Initialize every Key instance that used in this program
@@ -342,8 +433,7 @@ void renderScreen(String msg) {
     u8g2.setFontPosCenter();
     u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 24, char_array);
     if (bootConfigMode) {
-        String ip_str =
-            (String) "Web UI: " + WiFi.softAPIP().toString().c_str();
+        String ip_str = (String) "Web UI: " + WiFi.localIP().toString().c_str();
         int n = ip_str.length();
         char ip_char_array[n + 1];
         strcpy(ip_char_array, ip_str.c_str());
@@ -466,6 +556,7 @@ void checkIdle() {
 void checkBattery() {
     if (currentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
         batteryPercentage = getBatteryPercentage();
+        renderScreen("= w =");
         batteryPreviousMillis = currentMillis;
     }
     return;
