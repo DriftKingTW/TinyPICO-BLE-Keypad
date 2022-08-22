@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <BleKeyboard.h>
+#include <ESPmDNS.h>
 #include <SPIFFS.h>
 #include <TinyPICO.h>
 #include <U8g2lib.h>
@@ -199,22 +200,66 @@ void setup() {
         const char *ssid = doc["ssid"];
         const char *password = doc["password"];
 
-        WiFi.mode(WIFI_AP);
         // Connect to Wi-Fi network with SSID and password
         renderScreen("Connecting to WiFi..");
         Serial.print("Connecting to ");
         Serial.println(ssid);
+        WiFi.mode(WIFI_STA);
         WiFi.begin(ssid, password);
         while (WiFi.status() != WL_CONNECTED) {
             delay(500);
             Serial.print(".");
         }
-        Serial.println((String)ssid + "Connected!");
+
+        Serial.println("\nConnected!");
         Serial.println((String) "IP: " + WiFi.localIP().toString().c_str());
+        if (MDNS.begin("tp-keypad")) {
+            Serial.println("MDNS responder started");
+        }
+        server.enableCORS();
+
         server.on("/", handleRoot);
 
-        server.on("/inline", []() {
-            server.send(200, "text/plain", "this works as well");
+        server.on("/api/keyconfig", HTTP_PUT, []() {
+            DynamicJsonDocument res(512);
+            String buffer, body;
+            // Handle incoming JSON data
+            DynamicJsonDocument doc(jsonDocSize);
+            deserializeJson(doc, body);
+
+            // Return error if config is overflowed
+            if (doc.overflowed()) {
+                res["message"] = "overflowed";
+                serializeJson(res, buffer);
+                server.send(400, "application/json", buffer);
+                return;
+            }
+
+            const String filename = "keyconfig.json";
+
+            File config = SPIFFS.open("/" + filename, "w");
+            if (!config) {
+                res["message"] = "failed to create file";
+                serializeJson(res, buffer);
+                server.send(400, "application/json", buffer);
+                return;
+            }
+
+            // Serialize JSON to file
+            if (!serializeJson(doc, config)) {
+                res["message"] = "failed to write file";
+                serializeJson(res, buffer);
+                server.send(400, "application/json", buffer);
+                return;
+            }
+
+            // Writing JSON to file
+            else {
+                res["message"] = "success";
+                serializeJson(res, buffer);
+                server.send(200, "application/json", buffer);
+                return;
+            }
         });
 
         server.onNotFound(handleNotFound);
@@ -362,10 +407,9 @@ void initKeys() {
     // Show layout title on screen
     String layoutStr = doc[currentLayoutIndex]["title"];
     renderScreen("Layout: " + layoutStr);
+    Serial.println("Key layout loaded: " + layoutStr);
 
-    Serial.begin(115200);
-    setCpuFrequencyMhz(80);
-    Serial.println("CPU clock speed set to 80Mhz");
+        Serial.begin(115200);
 }
 
 /**
@@ -544,6 +588,9 @@ void switchBootMode() {
  *
  */
 void checkIdle() {
+    if (currentMillis - sleepPreviousMillis > 5000) {
+        renderScreen("= w =");
+    }
     if (currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
         goSleeping();
     }
@@ -556,7 +603,6 @@ void checkIdle() {
 void checkBattery() {
     if (currentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
         batteryPercentage = getBatteryPercentage();
-        renderScreen("= w =");
         batteryPreviousMillis = currentMillis;
     }
     return;
