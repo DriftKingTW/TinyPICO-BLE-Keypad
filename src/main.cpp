@@ -137,7 +137,7 @@ void setup() {
         0);         /* pin task to core 0 */
     Serial.println("LED Task started");
 
-    Serial.println("\n\nLoading SPIFFS...");
+    Serial.println("\nLoading SPIFFS...");
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
         return;
