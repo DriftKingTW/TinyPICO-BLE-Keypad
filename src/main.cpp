@@ -409,7 +409,11 @@ void initKeys() {
     renderScreen("Layout: " + layoutStr);
     Serial.println("Key layout loaded: " + layoutStr);
 
+    if (!bootConfigMode) {
         Serial.begin(115200);
+        setCpuFrequencyMhz(80);
+        Serial.println("CPU clock speed set to 80Mhz");
+    }
 }
 
 /**
