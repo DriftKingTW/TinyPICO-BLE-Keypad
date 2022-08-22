@@ -221,8 +221,13 @@ void setup() {
         server.on("/", handleRoot);
 
         server.on("/api/keyconfig", HTTP_PUT, []() {
+            if (server.hasArg("plain") == false) {
+                // Handle error here
+                Serial.println("Arg Error");
+            }
+            String body = server.arg("plain");
             DynamicJsonDocument res(512);
-            String buffer, body;
+            String buffer;
             // Handle incoming JSON data
             DynamicJsonDocument doc(jsonDocSize);
             deserializeJson(doc, body);
