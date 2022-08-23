@@ -614,6 +614,33 @@ void initWebServer() {
 
     server.on("/", handleRoot);
 
+    server.on("/api/keyconfig", HTTP_GET, []() {
+        DynamicJsonDocument res(jsonDocSize + 128);
+        String buffer;
+        DynamicJsonDocument doc(jsonDocSize);
+
+        Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
+        File file = SPIFFS.open("/keyconfig.json");
+        if (!file) {
+            Serial.println("Failed to open file for reading");
+            return;
+        }
+
+        Serial.println("Reading key configuration from \"keyconfig.json\"...");
+        String keyconfigJSON = "";
+        while (file.available()) {
+            keyconfigJSON += (char)file.read();
+        }
+        file.close();
+
+        deserializeJson(doc, keyconfigJSON);
+        res["message"] = "success";
+        res["keyconfig"] = doc;
+        serializeJson(res, buffer);
+        server.send(200, "application/json", buffer);
+        return;
+    });
+
     server.on("/api/keyconfig", HTTP_PUT, []() {
         if (server.hasArg("plain") == false) {
             // Handle error here
@@ -635,6 +662,81 @@ void initWebServer() {
         }
 
         const String filename = "keyconfig.json";
+
+        File config = SPIFFS.open("/" + filename, "w");
+        if (!config) {
+            res["message"] = "failed to create file";
+            serializeJson(res, buffer);
+            server.send(400, "application/json", buffer);
+            return;
+        }
+
+        // Serialize JSON to file
+        if (!serializeJson(doc, config)) {
+            res["message"] = "failed to write file";
+            serializeJson(res, buffer);
+            server.send(400, "application/json", buffer);
+            return;
+        }
+
+        // Writing JSON to file
+        else {
+            res["message"] = "success";
+            serializeJson(res, buffer);
+            server.send(200, "application/json", buffer);
+            updateKeyMaps = true;
+            return;
+        }
+    });
+
+    server.on("/api/network", HTTP_GET, []() {
+        DynamicJsonDocument res(256 + 128);
+        String buffer;
+        DynamicJsonDocument doc(256);
+
+        Serial.println("Loading \"wifi.json\" from SPIFFS...");
+        File file = SPIFFS.open("/wifi.json");
+        if (!file) {
+            Serial.println("Failed to open file for reading");
+            return;
+        }
+
+        Serial.println("Reading WIFI configuration from \"wifi.json\"...");
+        String wifiConfigJSON = "";
+        while (file.available()) {
+            wifiConfigJSON += (char)file.read();
+        }
+        file.close();
+
+        deserializeJson(doc, wifiConfigJSON);
+        res["message"] = "success";
+        res["wifi"] = doc;
+        serializeJson(res, buffer);
+        server.send(200, "application/json", buffer);
+        return;
+    });
+
+    server.on("/api/network", HTTP_PUT, []() {
+        if (server.hasArg("plain") == false) {
+            // Handle error here
+            Serial.println("Arg Error");
+        }
+        String body = server.arg("plain");
+        DynamicJsonDocument res(512);
+        String buffer;
+        // Handle incoming JSON data
+        DynamicJsonDocument doc(256);
+        deserializeJson(doc, body);
+
+        // Return error if config is overflowed
+        if (doc.overflowed()) {
+            res["message"] = "overflowed";
+            serializeJson(res, buffer);
+            server.send(400, "application/json", buffer);
+            return;
+        }
+
+        const String filename = "wifi.json";
 
         File config = SPIFFS.open("/" + filename, "w");
         if (!config) {
