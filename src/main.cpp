@@ -614,6 +614,31 @@ void initWebServer() {
 
     server.on("/", handleRoot);
 
+    server.on("/api/spiffs", HTTP_GET, []() {
+        DynamicJsonDocument res(256 + 128);
+        String buffer;
+        DynamicJsonDocument doc(256);
+
+        // create an empty array
+        JsonArray array = doc.to<JsonArray>();
+        StaticJsonDocument<128> item;
+
+        File root = SPIFFS.open("/");
+        File foundfile = root.openNextFile();
+        while (foundfile) {
+            item["name"] = String(foundfile.name());
+            item["size"] = humanReadableSize(foundfile.size());
+            array.add(item);
+            foundfile = root.openNextFile();
+        }
+
+        res["message"] = "success";
+        res["files"] = array;
+        serializeJson(res, buffer);
+        server.send(200, "application/json", buffer);
+        return;
+    });
+
     server.on("/api/keyconfig", HTTP_GET, []() {
         DynamicJsonDocument res(jsonDocSize + 128);
         String buffer;
