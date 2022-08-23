@@ -54,7 +54,8 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
 String currentKeyInfo = "";
 byte currentLayoutIndex = 0;
 byte layoutLength = 0;
-const short jsonDocSize = 4096;
+// For 10 Layers
+const short jsonDocSize = 16384;
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
 const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
