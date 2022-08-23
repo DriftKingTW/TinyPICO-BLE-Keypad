@@ -53,7 +53,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
-String currentKeyInfo = "";
+String currentKeyInfo = "", previousKeyInfo = "";
 byte currentLayoutIndex = 0;
 byte layoutLength = 0;
 // For 10 Layers
@@ -201,13 +201,16 @@ void generalStatusCheckTask(void *pvParameters) {
     while (true) {
         checkIdle();
         checkBattery();
+        if (!currentKeyInfo.isEmpty() && currentKeyInfo != previousKeyInfo) {
+            renderScreen(currentKeyInfo);
+        }
         if (currentMillis - previousMillis > 5000) {
             timeSinceBoot += (currentMillis - previousMillis) / 1000;
             previousMillis = currentMillis;
             Serial.println((String) "Time since boot: " + timeSinceBoot +
                            " seconds");
         }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
@@ -349,7 +352,6 @@ void keyPress(Key &key) {
     }
     key.state = true;
     if (currentKeyInfo != "key.keyInfo") {
-        renderScreen(key.keyInfo);
         currentKeyInfo = key.keyInfo;
     }
 }
@@ -364,7 +366,6 @@ void keyRelease(Key &key) {
         bleKeyboard.release(key.keyStroke);
     }
     key.state = false;
-    currentKeyInfo = "";
     return;
 }
 
