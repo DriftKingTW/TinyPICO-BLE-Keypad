@@ -201,8 +201,13 @@ void generalStatusCheckTask(void *pvParameters) {
     while (true) {
         checkIdle();
         checkBattery();
-        if (!currentKeyInfo.isEmpty() && currentKeyInfo != previousKeyInfo) {
+        if (currentKeyInfo != previousKeyInfo) {
+            previousKeyInfo = currentKeyInfo;
             renderScreen(currentKeyInfo);
+        }
+        // Idle message
+        if (currentMillis - sleepPreviousMillis > 5000) {
+            renderScreen("= w =");
         }
         if (currentMillis - previousMillis > 5000) {
             timeSinceBoot += (currentMillis - previousMillis) / 1000;
@@ -515,9 +520,6 @@ void switchBootMode() {
  *
  */
 void checkIdle() {
-    if (currentMillis - sleepPreviousMillis > 5000) {
-        renderScreen("= w =");
-    }
     if (currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
         goSleeping();
     }
