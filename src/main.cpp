@@ -429,6 +429,8 @@ void renderScreen(String msg) {
             result = "Plugged in";
             u8g2.drawStr((64 - u8g2.getStrWidth("\u0060") / 2) - 32, 10,
                          "\u0060");
+        } else if (batteryPercentage > 100) {
+            result = "Reading battery...";
         } else {
             result = (String)batteryPercentage + "%";
             if (batteryPercentage > 75) {
