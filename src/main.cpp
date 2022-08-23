@@ -18,6 +18,8 @@
 #define AUTHOR "DriftKingTW"
 #define ACTIVE LOW
 
+#define AP_SSID "TinyPICO Keypad WLAN"
+
 #define ROWS 5
 #define COLS 7
 
@@ -600,7 +602,8 @@ void initWebServer() {
     renderScreen("Connecting to WiFi..");
     Serial.print("Connecting to ");
     Serial.println(ssid);
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(AP_SSID, password);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
