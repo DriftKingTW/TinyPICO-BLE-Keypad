@@ -97,7 +97,7 @@ void breathLEDAnimation();
 int getBatteryPercentage();
 void showLowBatteryWarning();
 void checkBattery();
-void initWiFiServer();
+void initWebServer();
 void handleRoot();
 void handleNotFound();
 
@@ -568,7 +568,7 @@ void resetIdle() { sleepPreviousMillis = currentMillis; }
  * Activate WiFi and start the server
  *
  */
-void initWiFiServer() {
+void initWebServer() {
     Serial.println("Loading \"wifi.json\" from SPIFFS...");
     File file = SPIFFS.open("/wifi.json");
     if (!file) {
