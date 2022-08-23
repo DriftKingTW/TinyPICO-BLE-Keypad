@@ -241,6 +241,8 @@ void loop() {
             file.close();
             initKeys();
             updateKeyMaps = false;
+            resetIdle();
+            renderScreen("Config Updated!");
         }
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
