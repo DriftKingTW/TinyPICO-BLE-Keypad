@@ -19,6 +19,7 @@
 #define ACTIVE LOW
 
 #define AP_SSID "TinyPICO Keypad WLAN"
+#define MDNS_NAME "tp-keypad"
 
 #define ROWS 5
 #define COLS 7
@@ -617,8 +618,9 @@ void initWebServer() {
 
     Serial.println("\nConnected!");
     Serial.println((String) "IP: " + WiFi.localIP().toString().c_str());
-    if (MDNS.begin("tp-keypad")) {
-        Serial.println("MDNS responder started");
+    if (MDNS.begin(MDNS_NAME)) {
+        Serial.println((String) "MDNS responder started: " + MDNS_NAME +
+                       ".local");
     }
     server.enableCORS();
 
