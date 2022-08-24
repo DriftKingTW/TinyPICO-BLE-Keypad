@@ -270,7 +270,7 @@ void loop() {
                         goSleeping();
                     } else if (r == 0 && c == 0) {
                         switchBootMode();
-                    } else if (r == 4 && c == 0) {  // Switch layout
+                    } else if (keyMap[r][c].keyInfo == "FN") {  // Switch layout
                         if (currentLayoutIndex < layoutLength - 1) {
                             currentLayoutIndex++;
                         } else {
