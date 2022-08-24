@@ -76,6 +76,10 @@ const long BATTERY_INTERVAL = 5 * 1000;
 unsigned long ledPreviousMillis = 0;
 const long LED_INTERVAL = 5 * 1000;
 
+// IP/mDNS switch timer
+unsigned long networkInfoPreviousMillis = 0;
+const long NETWORK_INFO_INTERVAL = 5 * 1000;
+
 unsigned long currentMillis = 0;
 
 bool isLowBattery = false;
@@ -418,7 +422,18 @@ void renderScreen(String msg) {
     u8g2.setFontPosCenter();
     u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 24, char_array);
     if (bootConfigMode) {
-        String ip_str = (String) "Web UI: " + WiFi.localIP().toString().c_str();
+        String ip_str = "";
+        if (currentMillis - networkInfoPreviousMillis < NETWORK_INFO_INTERVAL) {
+            ip_str = (String)WiFi.localIP().toString().c_str();
+        } else if ((currentMillis - networkInfoPreviousMillis) <
+                   (NETWORK_INFO_INTERVAL * 2)) {
+            ip_str = (String)MDNS_NAME + ".local";
+        } else {
+            networkInfoPreviousMillis = currentMillis;
+        }
+        if (WiFi.localIP().toString() == "0.0.0.0") {
+            ip_str = "Connecting to...";
+        }
         int n = ip_str.length();
         char ip_char_array[n + 1];
         strcpy(ip_char_array, ip_str.c_str());
@@ -611,7 +626,7 @@ void initWebServer() {
     const char *password = doc["password"];
 
     // Connect to Wi-Fi network with SSID and password
-    renderScreen("Connecting to WiFi..");
+    renderScreen((String)ssid);
     Serial.print("Connecting to ");
     Serial.println(ssid);
     WiFi.mode(WIFI_AP_STA);
