@@ -5,13 +5,11 @@
 #include <SPIFFS.h>
 #include <TinyPICO.h>
 #include <U8g2lib.h>
+#include <WebServer.h>
 #include <WiFi.h>
 
 #include <cstring>
 #include <fstream>
-// #include <web-server.hpp>
-#include <WebServer.h>
-
 #include <helper.hpp>
 
 #define BLE_NAME "TinyPICO BLE"
@@ -57,7 +55,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
 String currentKeyInfo = "", previousKeyInfo = "";
 byte currentLayoutIndex = 0;
 byte layoutLength = 0;
-// For 10 Layers
+// For maximum 10 layers
 const short jsonDocSize = 16384;
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
@@ -86,7 +84,7 @@ bool updateKeyMaps = false;
 
 // Function declaration
 void ledTask(void *);
-void generalStatusCheckTask(void *);
+void generalTask(void *);
 void networkTask(void *);
 void initKeys();
 void goSleeping();
@@ -125,11 +123,11 @@ void setup() {
 
     Serial.println("Configuring General Status Check Task on CPU core 0...");
     xTaskCreatePinnedToCore(
-        generalStatusCheckTask,   /* Task function. */
-        "GeneralStatusCheckTask", /* name of task. */
-        5000,                     /* Stack size of task */
-        NULL,                     /* parameter of the task */
-        1,                        /* priority of the task */
+        generalTask,             /* Task function. */
+        "GeneralTask",           /* name of task. */
+        5000,                    /* Stack size of task */
+        NULL,                    /* parameter of the task */
+        1,                       /* priority of the task */
         &TaskGeneralStatusCheck, /* Task handle to keep track of created task */
         0);                      /* pin task to core 0 */
     Serial.println("General Status Check Task started");
@@ -184,15 +182,11 @@ void setup() {
     }
 }
 
-void ledTask(void *pvParameters) {
-    while (true) {
-        currentMillis = millis();
-        showLowBatteryWarning();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-void generalStatusCheckTask(void *pvParameters) {
+/**
+ * General tasks
+ *
+ */
+void generalTask(void *pvParameters) {
     int previousMillis = 0;
 
     while (true) {
@@ -216,6 +210,22 @@ void generalStatusCheckTask(void *pvParameters) {
     }
 }
 
+/**
+ * General tasks for LED related tasks
+ *
+ */
+void ledTask(void *pvParameters) {
+    while (true) {
+        currentMillis = millis();
+        showLowBatteryWarning();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+/**
+ * Network related tasks
+ *
+ */
 void networkTask(void *pvParameters) {
     while (true) {
         server.handleClient();
@@ -466,8 +476,6 @@ void renderScreen(String msg) {
  */
 int getBatteryPercentage() {
     const float minVoltage = 3.4, fullVolatge = 4.0;
-    // Get average battery voltage value from 10 time periods for more stable
-    // result
     float batteryVoltage = tp.GetBatteryVoltage();
 
     Serial.println((String) "Battery Voltage: " + batteryVoltage);
