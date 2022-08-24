@@ -55,6 +55,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
 String currentKeyInfo = "", previousKeyInfo = "";
 byte currentLayoutIndex = 0;
 byte layoutLength = 0;
+String currentLayout = "";
 // For maximum 10 layers
 const short jsonDocSize = 16384;
 
@@ -198,7 +199,7 @@ void generalTask(void *pvParameters) {
         }
         // Idle message
         if (currentMillis - sleepPreviousMillis > 5000) {
-            renderScreen("= w =");
+            renderScreen("Layout: " + currentLayout);
         }
         if (currentMillis - previousMillis > 5000) {
             timeSinceBoot += (currentMillis - previousMillis) / 1000;
@@ -342,9 +343,10 @@ void initKeys() {
     }
 
     // Show layout title on screen
-    String layoutStr = doc[currentLayoutIndex]["title"];
-    renderScreen("Layout: " + layoutStr);
-    Serial.println("Key layout loaded: " + layoutStr);
+    String str = doc[currentLayoutIndex]["title"];
+    currentLayout = str;
+    renderScreen("Layout: " + currentLayout);
+    Serial.println("Key layout loaded: " + currentLayout);
 
     if (!bootConfigMode) {
         Serial.begin(115200);
