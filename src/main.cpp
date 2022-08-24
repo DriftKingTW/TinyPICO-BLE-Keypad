@@ -643,6 +643,10 @@ void initWebServer() {
         }
 
         res["message"] = "success";
+        res["total"] = humanReadableSize(SPIFFS.totalBytes());
+        res["used"] = humanReadableSize(SPIFFS.usedBytes());
+        res["free"] =
+            humanReadableSize((SPIFFS.totalBytes() - SPIFFS.usedBytes()));
         res["files"] = array;
         serializeJson(res, buffer);
         server.send(200, "application/json", buffer);
