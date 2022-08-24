@@ -104,10 +104,6 @@ void initWebServer();
 void handleRoot();
 void handleNotFound();
 
-// Replace with your network credentials
-const char *ssid = "TP-Link_6060";
-const char *password = "10220328";
-
 // Set web server port number to 80
 WebServer server(80);
 
