@@ -106,6 +106,7 @@ void checkBattery();
 void initWebServer();
 void handleRoot();
 void handleNotFound();
+void sendCrossOriginHeader();
 
 // Set web server port number to 80
 WebServer server(80);
@@ -751,6 +752,8 @@ void initWebServer() {
         }
     });
 
+    server.on("/api/keyconfig", HTTP_OPTIONS, sendCrossOriginHeader);
+
     server.on("/api/network", HTTP_GET, []() {
         DynamicJsonDocument res(256 + 128);
         String buffer;
@@ -826,6 +829,8 @@ void initWebServer() {
         }
     });
 
+    server.on("/api/network", HTTP_OPTIONS, sendCrossOriginHeader);
+
     server.onNotFound(handleNotFound);
 
     server.begin();
@@ -844,3 +849,5 @@ void initWebServer() {
 void handleRoot() { server.send(200, "text/plain", "hello from esp32!"); }
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }
+
+void sendCrossOriginHeader() { server.send(204); }
