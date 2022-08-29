@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<head>
+    <title>TinyPICO Keypad Configuration Update Tool</title>
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    <!-- <script src="https://unpkg.com/vue@3"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <!-- <script src="https://unpkg.com/axios/dist/axios.min.js"></script> -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <style rel="stylesheet" type="text/css">
+        #wifi-container {
+            display: grid;
+            justify-content: center;
+            align-content: center;
+        }
+
+        #wifi {
+            display: grid;
+            align-content: center;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            margin: 2rem;
+            padding: 1rem;
+            width: 480px;
+            font-family: "Helvetica Neue", Helvetica, Arial;
+        }
+
+        #wifi>h1 {
+            font-size: 1.5rem;
+            font-weight: 2000;
+            line-height: 1.2;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        #wifi>.form-group {
+            font-size: 1rem;
+            font-weight: 500;
+            line-height: 1.2;
+            margin-bottom: 0.5rem;
+            text-align: center;
+            display: grid;
+        }
+
+        #wifi>.form-group>label {
+            display: flex;
+            align-items: center;
+            padding-left: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        #wifi>.form-group>input {
+            background-color: #EEE;
+            padding: 0.5rem;
+            margin: 0.5rem;
+            border-radius: 0.5rem;
+            border: none;
+        }
+
+        #wifi>.form-group>button {
+            background-color: #42A5F5;
+            color: #fff;
+            font-weight: bold;
+            padding: 0.5rem;
+            margin: 0.5rem;
+            border-radius: 0.5rem;
+            border: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" style="display: none;">
+        <v-app>
+            <v-app-bar app>
+                <v-toolbar-title>
+                    <v-icon left>mdi-keyboard</v-icon>
+                    TinyPICO BLE Keypad by DriftKingTW
+                </v-toolbar-title>
+            </v-app-bar>
+
+            <v-main>
+                <v-container fluid>
+                    <v-row>
+                        <v-col cols="12" md="6">
+                            <v-card flat :loading="isInitializing">
+                                <v-card-title>
+                                    <v-icon left>mdi-hammer-screwdriver</v-icon>
+                                    Keymap Configuration Update
+                                </v-card-title>
+                                <v-card-text>
+                                    <v-textarea v-model="keyconfig" :disabled="isInitializing" outlined hide-details
+                                        prepend-icon="mdi-code-json" label="Content of keyconfig.json"></v-textarea>
+                                </v-card-text>
+                                <v-card-actions>
+                                    <v-spacer></v-spacer>
+                                    <v-btn text color="primary" :loading="isUpdatingConfig" :disabled="isInitializing"
+                                        @click="updateConfig">
+                                        <v-icon left small>mdi-cloud-upload</v-icon>
+                                        Update
+                                    </v-btn>
+                                    <!-- <v-switch v-model="$vuetify.theme.dark" /> -->
+                                </v-card-actions>
+                            </v-card>
+                        </v-col>
+                        <v-col cols="12" md="6">
+
+                            <v-card>
+                                <v-card-title>
+                                    <v-icon left>mdi-sd</v-icon>
+                                    SPIFFS Information
+                                </v-card-title>
+                                <v-card-text>
+                                    <v-data-iterator :items="spiffs.files" hide-default-footer>
+                                        <template v-slot:default="props">
+                                            <v-row>
+                                                <v-col cols="6">
+                                                    <v-list dense>
+                                                        <v-list-item>
+                                                            <v-list-item-content class="align-end">
+                                                                <span>
+                                                                    <v-icon small left>mdi-database</v-icon>
+                                                                    Total
+                                                                </span>
+                                                            </v-list-item-content>
+                                                            <v-list-item-content class="align-end">
+                                                                {{ spiffs.total }}
+                                                            </v-list-item-content>
+                                                        </v-list-item>
+                                                        <v-list-item>
+                                                            <v-list-item-content class="align-end">
+                                                                <span>
+                                                                    <v-icon small left>mdi-file-document-multiple
+                                                                    </v-icon>
+                                                                    Used
+                                                                </span>
+                                                            </v-list-item-content>
+                                                            <v-list-item-content class="align-end">
+                                                                {{ spiffs.used }}
+                                                            </v-list-item-content>
+                                                        </v-list-item>
+                                                        <v-list-item>
+                                                            <v-list-item-content class="align-end">
+                                                                <span>
+                                                                    <v-icon small left>mdi-check</v-icon>
+                                                                    Free
+                                                                </span>
+                                                            </v-list-item-content>
+                                                            <v-list-item-content class="align-end">
+                                                                {{ spiffs.free }}
+                                                            </v-list-item-content>
+                                                        </v-list-item>
+                                                    </v-list>
+                                                </v-col>
+                                                <v-col cols="6">
+                                                    <v-list dense>
+                                                        <v-list-item v-for="data in props.items">
+                                                            <v-list-item-content class="align-end">
+                                                                <span>
+                                                                    <v-icon small left>mdi-code-json</v-icon>
+                                                                    {{ data.name }}
+                                                                </span>
+                                                            </v-list-item-content>
+                                                            <v-list-item-content class="align-end">
+                                                                {{ data.size }}
+                                                            </v-list-item-content>
+                                                        </v-list-item>
+                                                    </v-list>
+                                                </v-col>
+                                            </v-row>
+                                        </template>
+                                    </v-data-iterator>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+                </v-container>
+                <v-snackbar v-model="snackbar" :timeout="snackbarTimeout" :color="snackbarColor">
+                    <v-icon v-if="snackbarColor === 'info'" small left>
+                        mdi-information-outline
+                    </v-icon>
+                    <v-icon v-else-if="snackbarColor === 'success'" small left>
+                        mdi-check
+                    </v-icon>
+                    <v-icon v-else-if="snackbarColor === 'error'" small left>
+                        mdi-alert
+                    </v-icon>
+
+                    {{ snackbarText }}
+
+                    <template v-slot:action="{ attrs }">
+                        <v-btn text v-bind="attrs" @click="closeSnackbar">
+                            Close
+                        </v-btn>
+                    </template>
+                </v-snackbar>
+            </v-main>
+        </v-app>
+    </div>
+    <div id="wifi-container" style="display: none;">
+        <div id="wifi">
+            <h1>WiFi Configurator</h1>
+            <div class="form-group">
+                <label for="ssid">SSID</label>
+                <input type="text" class="form-control" id="ssid" placeholder="SSID">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" class="form-control" id="password" placeholder="Password">
+            </div>
+            <div class="form-group">
+                <button class="form-control" id="update-btn" onClick="updateWiFiConfig()">Update</button>
+            </div>
+            <div class="form-group">
+                <p id="server-response"></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        if (window.navigator.onLine) {
+            document.getElementById('app').style.display = ''
+        } else {
+            document.getElementById('wifi').style.display = ''
+        }
+
+        async function updateWiFiConfig() {
+            document.getElementById('update-btn').disabled = true;
+            const ssid = document.getElementById('ssid').value;
+            const password = document.getElementById('password').value;
+            let protocol = location.protocol;
+            let host = location.host;
+            let serverResponse = "";
+            if (password.length < 8) {
+                serverResponse = "Password must be at least 8 characters"
+                document.querySelector("#server-response").textContent = serverResponse;
+                document.getElementById('update-btn').disabled = false;
+                return;
+            }
+            try {
+                const options = {
+                    method: "PUT",
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json;charset=UTF-8",
+                    },
+                    body: JSON.stringify({
+                        ssid: ssid,
+                        password: password,
+                    }),
+                };
+                const res = await fetch(
+                    `${protocol}//${host}/api/network`,
+                    options
+                );
+                data = await res.json();
+                if (data.message === "success") {
+                    serverResponse = "Network configurations updated! Please reboot your device."
+                } else {
+                    serverResponse = data.message;
+                }
+            } catch (e) {
+                console.log(e);
+                serverResponse = e;
+            }
+            document.querySelector("#server-response").textContent = serverResponse;
+            document.getElementById('update-btn').disabled = false;
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+    <script>
+        // const { createApp } = Vue
+
+        var app = new Vue({
+            el: '#app',
+            vuetify: new Vuetify(),
+
+            data() {
+                return {
+                    tinypicoUrl: "",
+                    keyconfig: "",
+                    serverResponse: "",
+                    spiffs: [],
+                    snackbar: false,
+                    snackbarTimeout: 3000,
+                    snackbarColor: "",
+                    snackbarText: "",
+                    isUpdatingConfig: false,
+                    isInitializing: false
+                }
+            },
+
+            mounted() {
+                let dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                if (dark) this.$vuetify.theme.dark = true;
+                else this.$vuetify.theme.dark = false;
+
+                let protocol = location.protocol;
+                let host = location.host;
+                tinypicoUrl = `${protocol}//${host}`;
+                // tinypicoUrl = `http://tp-keypad.local`;
+                console.log(tinypicoUrl);
+
+                this.initialize();
+            },
+
+            methods: {
+                async initialize() {
+                    this.isInitializing = true;
+                    let res = await fetch(`${tinypicoUrl}/api/keyconfig`);
+                    let data = await res.json();
+                    this.keyconfig = JSON.stringify(data.keyconfig);
+                    res = await fetch(`${tinypicoUrl}/api/spiffs`);
+                    data = await res.json();
+                    this.spiffs = JSON.parse(JSON.stringify(data));
+                    this.isInitializing = false;
+                },
+                async updateConfig() {
+                    this.isUpdatingConfig = true;
+                    try {
+                        const options = {
+                            method: "PUT",
+                            headers: {
+                                Accept: "application/json",
+                                "Content-Type": "application/json;charset=UTF-8",
+                            },
+                            body: this.keyconfig,
+                        };
+                        const res = await fetch(
+                            `${tinypicoUrl}/api/keyconfig`,
+                            options
+                        );
+                        data = await res.json();
+                        if (data.message === "success") {
+                            this.serverResponse = "Key configurations updated"
+                            this.triggerSnackbar({ status: "success", text: this.serverResponse });
+                        } else {
+                            this.serverResponse = data.message;
+                            this.triggerSnackbar({ status: "error", text: this.serverResponse });
+                        }
+                    } catch (e) {
+                        console.log(e);
+                        this.serverResponse = e;
+                    }
+                    this.isUpdatingConfig = false;
+                },
+                triggerSnackbar({ status, text }) {
+                    if (status) this.snackbarColor = status;
+                    if (text) this.snackbarText = text;
+                    this.snackbar = true;
+                },
+                closeSnackbar() {
+                    this.snackbar = false;
+                },
+            }
+        })
+    </script>
+</body>
+
+</html>

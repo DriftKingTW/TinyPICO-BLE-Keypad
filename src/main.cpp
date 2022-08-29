@@ -631,19 +631,31 @@ void initWebServer() {
     Serial.print("Connecting to ");
     Serial.println(ssid);
     WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(AP_SSID, password);
     WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
 
-    Serial.println("\nConnected!");
-    Serial.println((String) "IP: " + WiFi.localIP().toString().c_str());
     if (MDNS.begin(MDNS_NAME)) {
         Serial.println((String) "MDNS responder started: " + MDNS_NAME +
                        ".local");
     }
+
+    short count = 0;
+    while (WiFi.status() != WL_CONNECTED && count < 20) {
+        delay(500);
+        Serial.print(".");
+        count++;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("\nWiFi connect failed! Activating soft AP...");
+        WiFi.disconnect();
+        WiFi.softAP(AP_SSID, password);
+    } else {
+        Serial.println("\nWiFi connected!");
+    }
+
+    Serial.println((String) "IP: " + WiFi.localIP().toString().c_str());
+    Serial.println((String) "Soft AP IP: " +
+                   WiFi.softAPIP().toString().c_str());
     server.enableCORS();
 
     server.on("/", handleRoot);
@@ -824,7 +836,6 @@ void initWebServer() {
             res["message"] = "success";
             serializeJson(res, buffer);
             server.send(200, "application/json", buffer);
-            updateKeyMaps = true;
             return;
         }
     });
@@ -846,7 +857,18 @@ void initWebServer() {
     Serial.println("Network service started");
 }
 
-void handleRoot() { server.send(200, "text/plain", "hello from esp32!"); }
+void handleRoot() {
+    String pathWithExtension = "/index.html";
+    if (SPIFFS.exists(pathWithExtension)) {
+        Serial.println(F("index found on SPIFFS"));
+        File file = SPIFFS.open(pathWithExtension, "r");
+        size_t sent = server.streamFile(file, "text/html");
+        file.close();
+    } else {
+        Serial.println(F("index not found on SPIFFS"));
+        handleNotFound;
+    }
+}
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }
 
