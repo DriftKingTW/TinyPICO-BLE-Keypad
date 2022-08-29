@@ -107,7 +107,6 @@
                             </v-card>
                         </v-col>
                         <v-col cols="12" md="6">
-
                             <v-card>
                                 <v-card-title>
                                     <v-icon left>mdi-sd</v-icon>
@@ -174,6 +173,33 @@
                                         </template>
                                     </v-data-iterator>
                                 </v-card-text>
+                                <v-card-title>
+                                    <v-icon left>mdi-wifi</v-icon>
+                                    Network Information
+                                </v-card-title>
+                                <v-card-text>
+                                    <v-row>
+                                        <v-col cols="5">
+                                            <v-text-field label="SSID" v-model="network.ssid" outlined dense>
+                                            </v-text-field>
+                                        </v-col>
+                                        <v-col cols="5">
+                                            <v-text-field label="Password" v-model="network.password" outlined dense
+                                                :append-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                                                :type="showPassword ? 'text' : 'password'"
+                                                @click:append="showPassword = !showPassword"
+                                                :rules="[rules.required, rules.min]">
+                                            </v-text-field>
+                                        </v-col>
+                                        <v-col cols="2">
+                                            <v-btn text color="primary" @click="updateNetworkConfig"
+                                                :loading="isUpdatingConfig" :disabled="isInitializing">
+                                                <v-icon left>mdi-check</v-icon>
+                                                Update
+                                            </v-btn>
+                                        </v-col>
+                                    </v-row>
+                                </v-card-text>
                             </v-card>
                         </v-col>
                     </v-row>
@@ -212,7 +238,7 @@
                 <input type="password" class="form-control" id="password" placeholder="Password">
             </div>
             <div class="form-group">
-                <button class="form-control" id="update-btn" onClick="updateWiFiConfig()">Update</button>
+                <button class="form-control" id="update-btn" onClick="updateNetworkConfigOffline()">Update</button>
             </div>
             <div class="form-group">
                 <p id="server-response"></p>
@@ -226,7 +252,7 @@
             document.getElementById('wifi').style.display = ''
         }
 
-        async function updateWiFiConfig() {
+        async function updateNetworkConfigOffline() {
             document.getElementById('update-btn').disabled = true;
             const ssid = document.getElementById('ssid').value;
             const password = document.getElementById('password').value;
@@ -284,12 +310,21 @@
                     keyconfig: "",
                     serverResponse: "",
                     spiffs: [],
+                    network: {
+                        ssid: "",
+                        password: "",
+                    },
                     snackbar: false,
                     snackbarTimeout: 3000,
                     snackbarColor: "",
                     snackbarText: "",
                     isUpdatingConfig: false,
-                    isInitializing: false
+                    isInitializing: false,
+                    showPassword: false,
+                    rules: {
+                        required: value => !!value || 'Required.',
+                        min: v => v.length >= 8 || 'Min 8 characters',
+                    },
                 }
             },
 
@@ -316,6 +351,9 @@
                     res = await fetch(`${tinypicoUrl}/api/spiffs`);
                     data = await res.json();
                     this.spiffs = JSON.parse(JSON.stringify(data));
+                    res = await fetch(`${tinypicoUrl}/api/network`);
+                    data = await res.json();
+                    this.network = JSON.parse(JSON.stringify(data.wifi));
                     this.isInitializing = false;
                 },
                 async updateConfig() {
@@ -336,6 +374,37 @@
                         data = await res.json();
                         if (data.message === "success") {
                             this.serverResponse = "Key configurations updated"
+                            this.triggerSnackbar({ status: "success", text: this.serverResponse });
+                        } else {
+                            this.serverResponse = data.message;
+                            this.triggerSnackbar({ status: "error", text: this.serverResponse });
+                        }
+                    } catch (e) {
+                        console.log(e);
+                        this.serverResponse = e;
+                    }
+                    this.isUpdatingConfig = false;
+                }, async updateNetworkConfig() {
+                    this.isUpdatingConfig = true;
+                    try {
+                        const options = {
+                            method: "PUT",
+                            headers: {
+                                Accept: "application/json",
+                                "Content-Type": "application/json;charset=UTF-8",
+                            },
+                            body: JSON.stringify({
+                                ssid: this.network.ssid,
+                                password: this.network.password,
+                            }),
+                        };
+                        const res = await fetch(
+                            `${tinypicoUrl}/api/network`,
+                            options
+                        );
+                        data = await res.json();
+                        if (data.message === "success") {
+                            this.serverResponse = "Network configurations updated"
                             this.triggerSnackbar({ status: "success", text: this.serverResponse });
                         } else {
                             this.serverResponse = data.message;
