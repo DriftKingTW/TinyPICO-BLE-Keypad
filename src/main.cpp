@@ -107,6 +107,8 @@ void initWebServer();
 void handleRoot();
 void handleNotFound();
 void sendCrossOriginHeader();
+bool handleFileRead(String);
+String getContentType(String);
 
 // Set web server port number to 80
 WebServer server(80);
@@ -870,6 +872,39 @@ void handleRoot() {
     }
 }
 
-void handleNotFound() { server.send(404, "text/plain", "Not found"); }
+void handleNotFound() {
+    if (!handleFileRead(server.uri())) {
+        server.send(404, "text/plain", "Not found");
+    }
+}
 
 void sendCrossOriginHeader() { server.send(204); }
+
+bool handleFileRead(String path) {
+    Serial.println("handleFileRead: " + path);
+    String contentType = getContentType(path);
+    if (SPIFFS.exists(path)) {
+        File file = SPIFFS.open(path, "r");
+        size_t sent = server.streamFile(file, contentType);
+        file.close();
+        return true;
+    }
+    Serial.println("\tFile Not Found");
+    return false;
+}
+
+String getContentType(String filename) {
+    if (filename.endsWith(".htm"))
+        return "text/html";
+    else if (filename.endsWith(".html"))
+        return "text/html";
+    else if (filename.endsWith(".css"))
+        return "text/css";
+    else if (filename.endsWith(".js"))
+        return "text/javascript";
+    else if (filename.endsWith(".jpg"))
+        return "image/jpeg";
+    else if (filename.endsWith(".ico"))
+        return "image/x-icon";
+    return "text/plain";
+}
