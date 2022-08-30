@@ -769,9 +769,9 @@ void initWebServer() {
     server.on("/api/keyconfig", HTTP_OPTIONS, sendCrossOriginHeader);
 
     server.on("/api/network", HTTP_GET, []() {
-        DynamicJsonDocument res(256 + 128);
+        DynamicJsonDocument res(512 + 128);
         String buffer;
-        DynamicJsonDocument doc(256);
+        DynamicJsonDocument doc(512);
 
         Serial.println("Loading \"wifi.json\" from SPIFFS...");
         File file = SPIFFS.open("/wifi.json");
@@ -788,6 +788,12 @@ void initWebServer() {
         file.close();
 
         deserializeJson(doc, wifiConfigJSON);
+        doc["rssi"] = WiFi.RSSI();
+        doc["mac"] = WiFi.macAddress();
+        doc["ip"] = WiFi.localIP();
+        doc["apIp"] = WiFi.softAPIP();
+        doc["subnetMask"] = WiFi.subnetMask();
+        doc["gatewayIP"] = WiFi.gatewayIP();
         res["message"] = "success";
         res["wifi"] = doc;
         serializeJson(res, buffer);
