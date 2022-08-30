@@ -663,9 +663,9 @@ void initWebServer() {
     server.on("/", handleRoot);
 
     server.on("/api/spiffs", HTTP_GET, []() {
-        DynamicJsonDocument res(256 + 128);
+        DynamicJsonDocument res(2048 + 128);
         String buffer;
-        DynamicJsonDocument doc(256);
+        DynamicJsonDocument doc(2048);
 
         // create an empty array
         JsonArray array = doc.to<JsonArray>();
