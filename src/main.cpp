@@ -198,6 +198,12 @@ void generalTask(void *pvParameters) {
     int previousMillis = 0;
 
     while (true) {
+        while (!bleKeyboard.isConnected()) {
+            renderScreen("Connecting BLE..");
+            breathLEDAnimation();
+            delay(100);
+        }
+
         checkIdle();
         checkBattery();
         if (currentKeyInfo != previousKeyInfo) {
@@ -242,14 +248,6 @@ void networkTask(void *pvParameters) {
 }
 
 void loop() {
-    renderScreen("Connecting BLE..");
-    breathLEDAnimation();
-
-    if (bleKeyboard.isConnected()) {
-        renderScreen("= Connected =");
-        tp.DotStar_SetPower(false);
-    }
-
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
         if (updateKeyMaps) {
