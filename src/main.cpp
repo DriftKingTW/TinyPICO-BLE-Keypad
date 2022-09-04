@@ -199,12 +199,14 @@ void generalTask(void *pvParameters) {
     int previousMillis = 0;
 
     while (true) {
+        // Show connecting message when BLE is disconnected
         while (!bleKeyboard.isConnected()) {
             renderScreen("Connecting BLE..");
             breathLEDAnimation();
             delay(100);
         }
 
+        // Show config updated message after keyconfig updated
         if (configUpdated) {
             renderScreen("Config Updated!");
             configUpdated = false;
@@ -213,6 +215,8 @@ void generalTask(void *pvParameters) {
 
         checkIdle();
         checkBattery();
+
+        // Show current pressed key info
         if (currentKeyInfo != previousKeyInfo) {
             previousKeyInfo = currentKeyInfo;
             renderScreen(currentKeyInfo);
@@ -221,12 +225,15 @@ void generalTask(void *pvParameters) {
         if (currentMillis - sleepPreviousMillis > 5000) {
             renderScreen("Layout: " + currentLayout);
         }
+
+        // Record boot time every 5 seconds
         if (currentMillis - previousMillis > 5000) {
             timeSinceBoot += (currentMillis - previousMillis) / 1000;
             previousMillis = currentMillis;
             Serial.println((String) "Time since boot: " + timeSinceBoot +
                            " seconds");
         }
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
