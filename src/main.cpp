@@ -437,6 +437,7 @@ void renderScreen(String msg) {
                    (NETWORK_INFO_INTERVAL * 2)) {
             ip_str = (String)MDNS_NAME + ".local";
         } else {
+            ip_str = (String)MDNS_NAME + ".local";
             networkInfoPreviousMillis = currentMillis;
         }
         if (WiFi.localIP().toString() == "0.0.0.0") {
