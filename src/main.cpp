@@ -86,6 +86,7 @@ bool isLowBattery = false;
 int batteryPercentage = 101;
 
 bool updateKeyMaps = false;
+bool configUpdated = false;
 
 // Function declaration
 void ledTask(void *);
@@ -204,6 +205,12 @@ void generalTask(void *pvParameters) {
             delay(100);
         }
 
+        if (configUpdated) {
+            renderScreen("Config Updated!");
+            configUpdated = false;
+            delay(1000);
+        }
+
         checkIdle();
         checkBattery();
         if (currentKeyInfo != previousKeyInfo) {
@@ -265,7 +272,7 @@ void loop() {
             initKeys();
             updateKeyMaps = false;
             resetIdle();
-            renderScreen("Config Updated!");
+            configUpdated = true;
         }
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
