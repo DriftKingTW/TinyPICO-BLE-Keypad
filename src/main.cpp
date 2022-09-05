@@ -8,9 +8,11 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <helper.hpp>
+#include <iterator>
 
 #define BLE_NAME "TinyPICO BLE"
 #define AUTHOR "DriftKingTW"
@@ -22,7 +24,7 @@
 #define ROWS 5
 #define COLS 7
 
-String keyMapJSON;
+String keyMapJSON = "", macroMapJSON = "";
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
                                             /* reset=*/U8X8_PIN_NONE);
@@ -45,6 +47,20 @@ struct Key {
 } key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
     key13, key14, key15, key16, key17, key18, key19, key20, key21, key22, key23,
     key24, key25, key26, key27, key28, key29, key30, key31, dummy;
+struct Macro {
+    unsigned short type;
+    // 6 key roll over using BLE keyboard
+    uint8_t keyStrokes[6];
+    String macroInfo;
+    String stringContent;
+} macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro9,
+    macro10, macro11, macro12, macro13, macro14, macro15, macro16, macro17,
+    macro18, macro19, macro20;
+
+Macro macroMap[20] = {macro1,  macro2,  macro3,  macro4,  macro5,
+                      macro6,  macro7,  macro8,  macro9,  macro10,
+                      macro11, macro12, macro13, macro14, macro15,
+                      macro16, macro17, macro18, macro19, macro20};
 
 Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key7, key8, key9, key10, key11, key12, key13},
@@ -52,7 +68,8 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
-String currentKeyInfo = "", previousKeyInfo = "";
+String currentKeyInfo = "";
+bool updateKeyInfo = "";
 byte currentLayoutIndex = 0;
 byte layoutLength = 0;
 String currentLayout = "";
@@ -93,6 +110,7 @@ void ledTask(void *);
 void generalTask(void *);
 void networkTask(void *);
 void initKeys();
+void initMacros();
 void goSleeping();
 void switchBootMode();
 void checkIdle();
@@ -100,6 +118,7 @@ void resetIdle();
 void renderScreen(String msg);
 void keyPress(Key &key);
 void keyRelease(Key &key);
+void macroPress(Macro &macro);
 void breathLEDAnimation();
 int getBatteryPercentage();
 void showLowBatteryWarning();
@@ -173,16 +192,25 @@ void setup() {
         Serial.println("Failed to open file for reading");
         return;
     }
-
-    keyMapJSON = "";
     while (file.available()) {
         keyMapJSON += (char)file.read();
+    }
+    file.close();
+
+    file = SPIFFS.open("/macros.json");
+    if (!file) {
+        Serial.println("Failed to open file for reading");
+        return;
+    }
+    while (file.available()) {
+        macroMapJSON += (char)file.read();
     }
     file.close();
 
     Serial.println("Configuring input pin...");
     currentLayoutIndex = savedLayoutIndex;
     initKeys();
+    initMacros();
 
     Serial.println("Setup finished!");
 
@@ -217,9 +245,9 @@ void generalTask(void *pvParameters) {
         checkBattery();
 
         // Show current pressed key info
-        if (currentKeyInfo != previousKeyInfo) {
-            previousKeyInfo = currentKeyInfo;
+        if (updateKeyInfo) {
             renderScreen(currentKeyInfo);
+            updateKeyInfo = false;
         }
         // Idle message
         if (currentMillis - sleepPreviousMillis > 5000) {
@@ -285,11 +313,14 @@ void loop() {
             digitalWrite(outputs[r], LOW);  // Setting one row low
             for (int c = 0; c < COLS; c++) {
                 if (digitalRead(inputs[c]) == ACTIVE) {
-                    if (r == 1 && c == 0) {  // Enter deep sleep mode
+                    resetIdle();
+                    if (r == 1 && c == 0) {
+                        // Enter deep sleep mode
                         goSleeping();
                     } else if (r == 0 && c == 0) {
                         switchBootMode();
-                    } else if (keyMap[r][c].keyInfo == "FN") {  // Switch layout
+                    } else if (keyMap[r][c].keyInfo == "FN") {
+                        // Switch layout
                         if (currentLayoutIndex < layoutLength - 1) {
                             currentLayoutIndex++;
                         } else {
@@ -298,9 +329,17 @@ void loop() {
                         savedLayoutIndex = currentLayoutIndex;
                         initKeys();
                         delay(300);
-                    } else {  // Standard key press
+                    } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
+                        // Macro press
+                        size_t index =
+                            keyMap[r][c]
+                                .keyInfo
+                                .substring(6, sizeof(keyMap[r][c].keyInfo) - 1)
+                                .toInt();
+                        macroPress(macroMap[index]);
+                    } else {
+                        // Standard key press
                         keyPress(keyMap[r][c]);
-                        resetIdle();
                     }
                 } else {
                     keyRelease(keyMap[r][c]);
@@ -375,6 +414,32 @@ void initKeys() {
 }
 
 /**
+ * Initialize every Macro instance that used in this program
+ *
+ */
+void initMacros() {
+    DynamicJsonDocument doc(jsonDocSize);
+    DeserializationError err = deserializeJson(
+        doc, macroMapJSON, DeserializationOption::NestingLimit(5));
+    if (err) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(err.c_str());
+    }
+    size_t macrosLength = doc.size();
+    for (size_t i = 0; i < macrosLength; i++) {
+        uint8_t macroLayout[] = {0, 0, 0, 0, 0, 0};
+        String macroNameStr = doc[i]["name"];
+        String macroStringContent = doc[i]["stringContent"];
+        macroMap[i].type = doc[i]["type"];
+        macroMap[i].macroInfo = macroNameStr;
+        macroMap[i].stringContent = macroStringContent;
+        copyArray(doc[i]["keyStrokes"], macroLayout);
+        std::copy(std::begin(macroLayout), std::end(macroLayout),
+                  std::begin(macroMap[i].keyStrokes));
+    }
+}
+
+/**
  * Press key
  *
  * @param {Key} key the key to be pressed
@@ -384,9 +449,8 @@ void keyPress(Key &key) {
         bleKeyboard.press(key.keyStroke);
     }
     key.state = true;
-    if (currentKeyInfo != "key.keyInfo") {
-        currentKeyInfo = key.keyInfo;
-    }
+    updateKeyInfo = true;
+    currentKeyInfo = key.keyInfo;
 }
 
 /**
@@ -400,6 +464,34 @@ void keyRelease(Key &key) {
     }
     key.state = false;
     return;
+}
+
+/**
+ * Press macro keys
+ *
+ * @param {Macro} macro to be pressed
+ * type 0: for key strokes
+ * type 1: for string content
+ * type 2: for string content w/ enter key
+ */
+void macroPress(Macro &macro) {
+    updateKeyInfo = true;
+    currentKeyInfo = macro.macroInfo;
+    if (macro.type == 0) {
+        size_t length = sizeof(macro.keyStrokes);
+        for (size_t i = 0; i < length; i++) {
+            Serial.println(macro.keyStrokes[i]);
+            bleKeyboard.press(macro.keyStrokes[i]);
+            delayMicroseconds(10);
+        }
+        delay(50);
+        bleKeyboard.releaseAll();
+    } else if (macro.type == 1) {
+        bleKeyboard.print(macro.stringContent);
+    } else if (macro.type == 2) {
+        bleKeyboard.println(macro.stringContent);
+    }
+    delay(100);
 }
 
 /**

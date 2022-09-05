@@ -1,0 +1,26 @@
+[
+  {
+    "type": 0,
+    "name": "Open SideNote",
+    "keyStrokes": [128, 130, 135, 32],
+    "stringContent": ""
+  },
+  {
+    "type": 0,
+    "name": "Spotlight",
+    "keyStrokes": [135, 32],
+    "stringContent": ""
+  },
+  {
+    "type": 1,
+    "name": "Typing Test 1",
+    "keyStrokes": [],
+    "stringContent": "Test strings w/o enter!!"
+  },
+  {
+    "type": 2,
+    "name": "Typing Test 2",
+    "keyStrokes": [],
+    "stringContent": "Test strings w/ enter!!"
+  }
+]
