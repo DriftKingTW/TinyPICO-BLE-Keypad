@@ -789,7 +789,7 @@ void initWebServer() {
 
         // create an empty array
         JsonArray array = doc.to<JsonArray>();
-        StaticJsonDocument<128> item;
+        StaticJsonDocument<256> item;
 
         File root = SPIFFS.open("/");
         File foundfile = root.openNextFile();
