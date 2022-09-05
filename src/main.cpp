@@ -293,20 +293,36 @@ void loop() {
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
         if (updateKeyMaps) {
+            resetIdle();
+
+            keyMapJSON = "";
+            macroMapJSON = "";
+
             Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
             File file = SPIFFS.open("/keyconfig.json");
             if (!file) {
                 Serial.println("Failed to open file for reading");
                 return;
             }
-            keyMapJSON = "";
             while (file.available()) {
                 keyMapJSON += (char)file.read();
             }
             file.close();
+
+            file = SPIFFS.open("/macros.json");
+            if (!file) {
+                Serial.println("Failed to open file for reading");
+                return;
+            }
+            while (file.available()) {
+                macroMapJSON += (char)file.read();
+            }
+            file.close();
+
             initKeys();
+            initMacros();
+
             updateKeyMaps = false;
-            resetIdle();
             configUpdated = true;
         }
         for (int r = 0; r < ROWS; r++) {
@@ -480,7 +496,6 @@ void macroPress(Macro &macro) {
     if (macro.type == 0) {
         size_t length = sizeof(macro.keyStrokes);
         for (size_t i = 0; i < length; i++) {
-            Serial.println(macro.keyStrokes[i]);
             bleKeyboard.press(macro.keyStrokes[i]);
             delayMicroseconds(10);
         }
@@ -796,19 +811,33 @@ void initWebServer() {
         return;
     });
 
-    server.on("/api/keyconfig", HTTP_GET, []() {
+    server.on("/api/config", HTTP_GET, []() {
+        if (server.hasArg("plain") == false) {
+            // Handle error here
+            Serial.println("Arg Error");
+        }
+        String type = server.arg("type");
         DynamicJsonDocument res(jsonDocSize + 128);
         String buffer;
         DynamicJsonDocument doc(jsonDocSize);
 
-        Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
-        File file = SPIFFS.open("/keyconfig.json");
+        String filename = "";
+
+        if (type == "keyconfig" || type == "macros") {
+            filename = type;
+        } else {
+            filename = "keyconfig";
+        }
+
+        Serial.println("Loading \"" + filename + ".json\" from SPIFFS...");
+        File file = SPIFFS.open("/" + filename + ".json");
         if (!file) {
             Serial.println("Failed to open file for reading");
             return;
         }
 
-        Serial.println("Reading key configuration from \"keyconfig.json\"...");
+        Serial.println("Reading key configuration from \"" + filename +
+                       ".json\"...");
         String keyconfigJSON = "";
         while (file.available()) {
             keyconfigJSON += (char)file.read();
@@ -817,17 +846,18 @@ void initWebServer() {
 
         deserializeJson(doc, keyconfigJSON);
         res["message"] = "success";
-        res["keyconfig"] = doc;
+        res["config"] = doc;
         serializeJson(res, buffer);
         server.send(200, "application/json", buffer);
         return;
     });
 
-    server.on("/api/keyconfig", HTTP_PUT, []() {
+    server.on("/api/config", HTTP_PUT, []() {
         if (server.hasArg("plain") == false) {
             // Handle error here
             Serial.println("Arg Error");
         }
+        String type = server.arg("type");
         String body = server.arg("plain");
         DynamicJsonDocument res(512);
         String buffer;
@@ -843,9 +873,13 @@ void initWebServer() {
             return;
         }
 
-        const String filename = "keyconfig.json";
+        String filename = "";
 
-        File config = SPIFFS.open("/" + filename, "w");
+        if (type == "keyconfig" || type == "macros") {
+            filename = type;
+        }
+
+        File config = SPIFFS.open("/" + filename + ".json", "w");
         if (!config) {
             res["message"] = "failed to create file";
             serializeJson(res, buffer);
@@ -871,7 +905,7 @@ void initWebServer() {
         }
     });
 
-    server.on("/api/keyconfig", HTTP_OPTIONS, sendCrossOriginHeader);
+    server.on("/api/config", HTTP_OPTIONS, sendCrossOriginHeader);
 
     server.on("/api/network", HTTP_GET, []() {
         DynamicJsonDocument res(512 + 128);
