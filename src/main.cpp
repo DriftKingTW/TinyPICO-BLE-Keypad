@@ -87,7 +87,7 @@ const long SLEEP_INTERVAL = 10 * 60 * 1000;
 
 // Battery timer
 unsigned long batteryPreviousMillis = 0;
-const long BATTERY_INTERVAL = 5 * 1000;
+const long BATTERY_INTERVAL = 10 * 1000;
 
 // Low battery LED blink timer
 unsigned long ledPreviousMillis = 0;
@@ -677,7 +677,8 @@ void checkIdle() {
  *
  */
 void checkBattery() {
-    if (currentMillis - batteryPreviousMillis > BATTERY_INTERVAL) {
+    if (currentMillis - batteryPreviousMillis > BATTERY_INTERVAL ||
+        batteryPercentage > 100) {
         batteryPercentage = getBatteryPercentage();
         batteryPreviousMillis = currentMillis;
     }
