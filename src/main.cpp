@@ -231,6 +231,7 @@ void generalTask(void *pvParameters) {
         while (!bleKeyboard.isConnected()) {
             renderScreen("Connecting BLE..");
             breathLEDAnimation();
+            checkIdle();
             delay(100);
         }
 
