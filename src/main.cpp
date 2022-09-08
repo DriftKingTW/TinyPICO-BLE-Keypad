@@ -34,7 +34,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
 
 String keyMapJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
-bool updateKeyInfo = "";
+bool updateKeyInfo = false;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
 byte layoutLength = 0;
 String currentLayout = "";
