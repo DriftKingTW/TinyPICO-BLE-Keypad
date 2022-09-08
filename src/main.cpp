@@ -35,6 +35,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
 String keyMapJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
 bool updateKeyInfo = false;
+bool isFnKeyPressed = false;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
 byte layoutLength = 0;
 String currentLayout = "";
@@ -237,12 +238,12 @@ void loop() {
             for (int c = 0; c < COLS; c++) {
                 if (digitalRead(inputs[c]) == ACTIVE) {
                     resetIdle();
-                    if (r == 1 && c == 0) {
+                    if (isFnKeyPressed && r == 0 && c == 0) {
                         // Enter deep sleep mode
                         goSleeping();
-                    } else if (r == 0 && c == 0) {
+                    } else if (isFnKeyPressed && r == 1 && c == 0) {
                         switchBootMode();
-                    } else if (keyMap[r][c].keyInfo == "FN") {
+                    } else if (isFnKeyPressed && r == 4 && c == 4) {
                         // Switch layout
                         if (currentLayoutIndex < layoutLength - 1) {
                             currentLayoutIndex++;
@@ -378,6 +379,9 @@ void updateKeymaps() {
  * @param {Key} key the key to be pressed
  */
 void keyPress(Key &key) {
+    if (key.keyInfo == "FN") {
+        isFnKeyPressed = true;
+    }
     if (key.state == false) {
         bleKeyboard.press(key.keyStroke);
     }
@@ -392,6 +396,9 @@ void keyPress(Key &key) {
  * @param {Key} key the key to be released
  */
 void keyRelease(Key &key) {
+    if (key.keyInfo == "FN") {
+        isFnKeyPressed = false;
+    }
     if (key.state == true) {
         bleKeyboard.release(key.keyStroke);
     }
