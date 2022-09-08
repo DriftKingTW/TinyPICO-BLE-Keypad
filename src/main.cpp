@@ -1,30 +1,7 @@
-#include <Arduino.h>
-#include <ArduinoJson.h>
-#include <BleKeyboard.h>
-#include <ESPmDNS.h>
-#include <SPIFFS.h>
-#include <TinyPICO.h>
-#include <U8g2lib.h>
-#include <WebServer.h>
-#include <WiFi.h>
+#include <main.hpp>
 
-#include <algorithm>
-#include <cstring>
-#include <fstream>
-#include <helper.hpp>
-#include <iterator>
-
-#define BLE_NAME "TinyPICO BLE"
-#define AUTHOR "DriftKingTW"
-#define ACTIVE LOW
-
-#define AP_SSID "TinyPICO Keypad WLAN"
-#define MDNS_NAME "tp-keypad"
-
-#define ROWS 5
-#define COLS 7
-
-String keyMapJSON = "", macroMapJSON = "";
+RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
+RTC_DATA_ATTR bool bootConfigMode = false;
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
                                             /* reset=*/U8X8_PIN_NONE);
@@ -35,25 +12,12 @@ TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
 
-RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
-RTC_DATA_ATTR unsigned int savedLayoutIndex = 0;
-RTC_DATA_ATTR bool bootConfigMode = false;
-
 // Stucture for key stroke
-struct Key {
-    uint8_t keyStroke;
-    bool state;
-    String keyInfo;
-} key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
+Key key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
     key13, key14, key15, key16, key17, key18, key19, key20, key21, key22, key23,
     key24, key25, key26, key27, key28, key29, key30, key31, dummy;
-struct Macro {
-    unsigned short type;
-    // 6 key roll over using BLE keyboard
-    uint8_t keyStrokes[6];
-    String macroInfo;
-    String stringContent;
-} macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro9,
+
+Macro macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro9,
     macro10, macro11, macro12, macro13, macro14, macro15, macro16, macro17,
     macro18, macro19, macro20;
 
@@ -68,9 +32,10 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
 
+String keyMapJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
 bool updateKeyInfo = "";
-byte currentLayoutIndex = 0;
+RTC_DATA_ATTR byte currentLayoutIndex = 0;
 byte layoutLength = 0;
 String currentLayout = "";
 // For maximum 10 layers
@@ -102,43 +67,20 @@ unsigned long currentMillis = 0;
 bool isLowBattery = false;
 int batteryPercentage = 101;
 
-bool updateKeyMaps = false;
+bool keymapsNeedsUpdate = false;
 bool configUpdated = false;
-
-// Function declaration
-void ledTask(void *);
-void generalTask(void *);
-void networkTask(void *);
-void initKeys();
-void initMacros();
-void goSleeping();
-void switchBootMode();
-void checkIdle();
-void resetIdle();
-void renderScreen(String msg);
-void keyPress(Key &key);
-void keyRelease(Key &key);
-void macroPress(Macro &macro);
-void breathLEDAnimation();
-int getBatteryPercentage();
-void showLowBatteryWarning();
-void checkBattery();
-void initWebServer();
-void handleRoot();
-void handleNotFound();
-void sendCrossOriginHeader();
-bool handleFileRead(String);
-String getContentType(String);
 
 // Set web server port number to 80
 WebServer server(80);
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(BAUD_RATE);
 
-    if (bootConfigMode) {
-        Serial.println("\nBooting in update config mode...\n");
-    }
+    printSpacer();
+
+    setCPUFrequency(240);
+
+    printSpacer();
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
@@ -146,8 +88,10 @@ void setup() {
     Serial.println("Starting u8g2...");
     u8g2.begin();
 
+    printSpacer();
+
     Serial.println("Configuring ext1 wakeup source...");
-    esp_sleep_enable_ext1_wakeup(0x8000, ESP_EXT1_WAKEUP_ANY_HIGH);
+    esp_sleep_enable_ext1_wakeup(WAKEUP_KEY_BITMAP, ESP_EXT1_WAKEUP_ANY_HIGH);
 
     Serial.println("Configuring General Status Check Task on CPU core 0...");
     xTaskCreatePinnedToCore(
@@ -158,7 +102,6 @@ void setup() {
         1,                       /* priority of the task */
         &TaskGeneralStatusCheck, /* Task handle to keep track of created task */
         0);                      /* pin task to core 0 */
-    Serial.println("General Status Check Task started");
 
     xTaskCreatePinnedToCore(
         ledTask,    /* Task function. */
@@ -168,9 +111,10 @@ void setup() {
         1,          /* priority of the task */
         &TaskLED,   /* Task handle to keep track of created task */
         0);         /* pin task to core 0 */
-    Serial.println("LED Task started");
 
-    Serial.println("\nLoading SPIFFS...");
+    printSpacer();
+
+    Serial.println("Loading SPIFFS...");
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
         return;
@@ -186,37 +130,29 @@ void setup() {
 
     Serial.println(listFiles());
 
-    Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
-    File file = SPIFFS.open("/keyconfig.json");
-    if (!file) {
-        Serial.println("Failed to open file for reading");
-        return;
-    }
-    while (file.available()) {
-        keyMapJSON += (char)file.read();
-    }
-    file.close();
+    Serial.println("Loading config files from SPIFFS...");
+    keyMapJSON = loadJSONFileAsString("keyconfig");
+    macroMapJSON = loadJSONFileAsString("macros");
 
-    file = SPIFFS.open("/macros.json");
-    if (!file) {
-        Serial.println("Failed to open file for reading");
-        return;
-    }
-    while (file.available()) {
-        macroMapJSON += (char)file.read();
-    }
-    file.close();
+    printSpacer();
 
-    Serial.println("Configuring input pin...");
-    currentLayoutIndex = savedLayoutIndex;
+    Serial.println("Configuring input pin and keys...");
     initKeys();
     initMacros();
 
-    Serial.println("Setup finished!");
+    printSpacer();
 
     if (bootConfigMode) {
         initWebServer();
+    } else {
+        setCPUFrequency(80);
     }
+
+    printSpacer();
+
+    Serial.println("Setup finished!");
+
+    printSpacer();
 }
 
 /**
@@ -293,38 +229,8 @@ void networkTask(void *pvParameters) {
 void loop() {
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
-        if (updateKeyMaps) {
-            resetIdle();
-
-            keyMapJSON = "";
-            macroMapJSON = "";
-
-            Serial.println("Loading \"keyconfig.json\" from SPIFFS...");
-            File file = SPIFFS.open("/keyconfig.json");
-            if (!file) {
-                Serial.println("Failed to open file for reading");
-                return;
-            }
-            while (file.available()) {
-                keyMapJSON += (char)file.read();
-            }
-            file.close();
-
-            file = SPIFFS.open("/macros.json");
-            if (!file) {
-                Serial.println("Failed to open file for reading");
-                return;
-            }
-            while (file.available()) {
-                macroMapJSON += (char)file.read();
-            }
-            file.close();
-
-            initKeys();
-            initMacros();
-
-            updateKeyMaps = false;
-            configUpdated = true;
+        if (keymapsNeedsUpdate) {
+            updateKeymaps();
         }
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
@@ -343,7 +249,6 @@ void loop() {
                         } else {
                             currentLayoutIndex = 0;
                         }
-                        savedLayoutIndex = currentLayoutIndex;
                         initKeys();
                         delay(300);
                     } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
@@ -376,10 +281,6 @@ void loop() {
  *
  */
 void initKeys() {
-    Serial.begin(115200);
-    setCpuFrequencyMhz(240);
-
-    Serial.println("CPU clock speed set to 240Mhz");
     Serial.println("Reading JSON keymap configuration...");
 
     DynamicJsonDocument doc(jsonDocSize);
@@ -422,12 +323,6 @@ void initKeys() {
     currentLayout = str;
     renderScreen("Layout: " + currentLayout);
     Serial.println("Key layout loaded: " + currentLayout);
-
-    if (!bootConfigMode) {
-        Serial.begin(115200);
-        setCpuFrequencyMhz(80);
-        Serial.println("CPU clock speed set to 80Mhz");
-    }
 }
 
 /**
@@ -454,6 +349,27 @@ void initMacros() {
         std::copy(std::begin(macroLayout), std::end(macroLayout),
                   std::begin(macroMap[i].keyStrokes));
     }
+}
+
+/**
+ * Update keymaps
+ *
+ */
+void updateKeymaps() {
+    resetIdle();
+
+    keyMapJSON = "";
+    macroMapJSON = "";
+
+    Serial.println("Loading config files from SPIFFS...");
+    keyMapJSON = loadJSONFileAsString("keyconfig");
+    macroMapJSON = loadJSONFileAsString("macros");
+
+    initKeys();
+    initMacros();
+
+    keymapsNeedsUpdate = false;
+    configUpdated = true;
 }
 
 /**
@@ -508,6 +424,35 @@ void macroPress(Macro &macro) {
         bleKeyboard.println(macro.stringContent);
     }
     delay(100);
+}
+
+/**
+ * Load JSON file as string from SPIFFS
+ *
+ * @param {filename} JSON file name (w/o extension)
+ * @return {filestring} file content as string
+ */
+String loadJSONFileAsString(String filename) {
+    File file = SPIFFS.open("/" + filename + ".json");
+    String buffer;
+    if (!file) {
+        Serial.println("Failed to open file for reading");
+    }
+    while (file.available()) {
+        buffer += (char)file.read();
+    }
+    file.close();
+    return buffer;
+}
+
+/**
+ * Set CPU Frequency by Mhz and print it on serial
+ *
+ */
+void setCPUFrequency(int freq) {
+    Serial.begin(BAUD_RATE);
+    setCpuFrequencyMhz(freq);
+    Serial.println("CPU clock speed set to " + String(freq) + "Mhz");
 }
 
 /**
@@ -902,7 +847,7 @@ void initWebServer() {
             res["message"] = "success";
             serializeJson(res, buffer);
             server.send(200, "application/json", buffer);
-            updateKeyMaps = true;
+            keymapsNeedsUpdate = true;
             return;
         }
     });

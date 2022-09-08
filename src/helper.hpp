@@ -40,3 +40,7 @@ String listFiles(bool ishtml = false) {
     foundfile.close();
     return returnText;
 }
+
+void printSpacer() {
+    Serial.println("========================================");
+}
