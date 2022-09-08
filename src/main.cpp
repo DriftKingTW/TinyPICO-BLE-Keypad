@@ -238,20 +238,20 @@ void loop() {
             for (int c = 0; c < COLS; c++) {
                 if (digitalRead(inputs[c]) == ACTIVE) {
                     resetIdle();
-                    if (isFnKeyPressed && r == 0 && c == 0) {
-                        // Enter deep sleep mode
-                        goSleeping();
-                    } else if (isFnKeyPressed && r == 1 && c == 0) {
-                        switchBootMode();
-                    } else if (isFnKeyPressed && r == 4 && c == 4) {
-                        // Switch layout
-                        if (currentLayoutIndex < layoutLength - 1) {
-                            currentLayoutIndex++;
-                        } else {
-                            currentLayoutIndex = 0;
+                    if (isFnKeyPressed) {
+                        if (r == 0 && c == 0) {
+                            goSleeping();
+                        } else if (r == 1 && c == 0) {
+                            switchBootMode();
+                        } else if (r == 4 && c == 4) {
+                            // Switch layout
+                            currentLayoutIndex =
+                                currentLayoutIndex < layoutLength - 1
+                                    ? currentLayoutIndex + 1
+                                    : 0;
+                            initKeys();
+                            delay(300);
                         }
-                        initKeys();
-                        delay(300);
                     } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
                         // Macro press
                         size_t index =
