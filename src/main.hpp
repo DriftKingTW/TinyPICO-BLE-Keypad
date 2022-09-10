@@ -13,6 +13,7 @@
 #include <fstream>
 #include <helper.hpp>
 #include <iterator>
+#include <loading.hpp>
 #include <string>
 
 using namespace std;

@@ -181,6 +181,12 @@ void setup() {
 void generalTask(void *pvParameters) {
     int previousMillis = 0;
 
+    // if (bootConfigMode) {
+    //     networkAnimation(u8g2);
+    // } else {
+    //     loadingAnimation(u8g2);
+    // }
+
     while (true) {
         checkBattery();
 
@@ -239,6 +245,12 @@ void generalTask(void *pvParameters) {
             contentBottom = "Config Updated!";
             configUpdated = false;
             delay(1000);
+        }
+
+        if (showCompleteAnimation) {
+            finishAnimation(u8g2);
+            showCompleteAnimation = false;
+            contentBottom = "Layout: " + currentLayout;
         }
 
         checkIdle();
