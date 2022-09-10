@@ -47,6 +47,7 @@ struct Macro {
 };
 
 // Tasks
+void keyboardScanTask(void *);
 void ledTask(void *);
 void generalTask(void *);
 void networkTask(void *);
