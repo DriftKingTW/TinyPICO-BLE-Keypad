@@ -8,7 +8,6 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 TinyPICO tp = TinyPICO();
 
-TaskHandle_t TaskKeyboardScan;
 TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
@@ -74,7 +73,6 @@ bool keymapsNeedsUpdate = false;
 bool configUpdated = false;
 bool showCompleteAnimation = false;
 bool isSoftAPEnabled = false;
-bool isNetworkConnected = false;
 
 // OLED Screen Content
 String contentTop = "";
@@ -106,13 +104,13 @@ void setup() {
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(WAKEUP_KEY_BITMAP, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-    Serial.println("Configuring General Status Check Task...");
+    Serial.println("Configuring General Status Check Task on CPU core 0...");
     xTaskCreatePinnedToCore(
-        generalTask,                 /* Task function. */
-        "General Status Check Task", /* name of task. */
-        5000,                        /* Stack size of task */
-        NULL,                        /* parameter of the task */
-        1,                           /* priority of the task */
+        generalTask,             /* Task function. */
+        "GeneralTask",           /* name of task. */
+        5000,                    /* Stack size of task */
+        NULL,                    /* parameter of the task */
+        1,                       /* priority of the task */
         &TaskGeneralStatusCheck, /* Task handle to keep track of created task */
         0);                      /* pin task to core 0 */
 
@@ -164,16 +162,6 @@ void setup() {
 
     printSpacer();
 
-    Serial.println("Configuring keyboard scan task...");
-    xTaskCreatePinnedToCore(
-        keyboardScanTask,     /* Task function. */
-        "Keyboard Scan Task", /* name of task. */
-        5000,                 /* Stack size of task */
-        NULL,                 /* parameter of the task */
-        1,                    /* priority of the task */
-        &TaskKeyboardScan,    /* Task handle to keep track of created task */
-        1);                   /* pin task to core 1 */
-
     if (bootConfigMode) {
         initWebServer();
     } else {
@@ -221,7 +209,7 @@ void generalTask(void *pvParameters) {
             if (isSoftAPEnabled) {
                 contentIcon = 3;
             } else if (WiFi.localIP().toString() == "0.0.0.0") {
-                networkInfo = "Connecting to WiFi";
+                networkInfo = "Connecting to...";
                 contentIcon = 2;
             }
             contentTop = networkInfo;
@@ -275,8 +263,7 @@ void generalTask(void *pvParameters) {
         }
 
         // Idle message
-        if (currentMillis - sleepPreviousMillis > 5000 &&
-            (!bootConfigMode || isNetworkConnected)) {
+        if (currentMillis - sleepPreviousMillis > 5000) {
             contentBottom = "Layout: " + currentLayout;
         }
 
@@ -293,12 +280,42 @@ void generalTask(void *pvParameters) {
 }
 
 /**
- * Keyboard scan tasks
+ * General tasks for LED related tasks
  *
  */
-void keyboardScanTask(void *pvParameters) {
+void ledTask(void *pvParameters) {
     while (true) {
-        // Check every keystroke is pressed or not
+        currentMillis = millis();
+        showLowBatteryWarning();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+/**
+ * Network related tasks
+ *
+ */
+void networkTask(void *pvParameters) {
+    while (true) {
+        server.handleClient();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+/**
+ * OLED screen related tasks
+ *
+ */
+void screenTask(void *pvParameters) {
+    while (true) {
+        renderScreen();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+void loop() {
+    // Check every keystroke is pressed or not when connected
+    while (bleKeyboard.isConnected()) {
         if (keymapsNeedsUpdate) {
             updateKeymaps();
             showCompleteAnimation = true;
@@ -344,43 +361,8 @@ void keyboardScanTask(void *pvParameters) {
         }
         delay(10);
     }
+    delay(100);
 }
-
-/**
- * General tasks for LED related tasks
- *
- */
-void ledTask(void *pvParameters) {
-    while (true) {
-        currentMillis = millis();
-        showLowBatteryWarning();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-/**
- * Network related tasks
- *
- */
-void networkTask(void *pvParameters) {
-    while (true) {
-        server.handleClient();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-/**
- * OLED screen related tasks
- *
- */
-void screenTask(void *pvParameters) {
-    while (true) {
-        renderScreen();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-void loop() { vTaskDelay(1000 / portTICK_PERIOD_MS); }
 
 /**
  * Initialize every Key instance that used in this program
@@ -791,6 +773,7 @@ void initWebServer() {
     const char *password = doc["password"];
 
     // Connect to Wi-Fi network with SSID and password
+    contentBottom = (String)ssid;
     Serial.print("Connecting to ");
     Serial.println(ssid);
     WiFi.mode(WIFI_AP_STA);
@@ -803,7 +786,6 @@ void initWebServer() {
 
     short count = 0;
     while (WiFi.status() != WL_CONNECTED && count < 20) {
-        contentBottom = (String)ssid;
         delay(500);
         Serial.print(".");
         count++;
@@ -817,8 +799,6 @@ void initWebServer() {
     } else {
         Serial.println("\nWiFi connected!");
     }
-
-    isNetworkConnected = true;
 
     Serial.println((String) "IP: " + WiFi.localIP().toString().c_str());
     Serial.println((String) "Soft AP IP: " +
