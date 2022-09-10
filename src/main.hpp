@@ -13,6 +13,9 @@
 #include <fstream>
 #include <helper.hpp>
 #include <iterator>
+#include <string>
+
+using namespace std;
 
 #define BAUD_RATE 115200
 
@@ -46,6 +49,7 @@ struct Macro {
 void ledTask(void *);
 void generalTask(void *);
 void networkTask(void *);
+void screenTask(void *);
 
 // Keyboard
 void initKeys();
@@ -56,7 +60,7 @@ void keyRelease(Key &key);
 void macroPress(Macro &macro);
 
 // OLED Control
-void renderScreen(String msg);
+void renderScreen();
 
 // Power Management
 void switchBootMode();

@@ -11,6 +11,7 @@ TinyPICO tp = TinyPICO();
 TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
+TaskHandle_t TaskScreen;
 
 // Stucture for key stroke
 Key key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
@@ -70,6 +71,14 @@ int batteryPercentage = 101;
 
 bool keymapsNeedsUpdate = false;
 bool configUpdated = false;
+bool showCompleteAnimation = false;
+bool isSoftAPEnabled = false;
+
+// OLED Screen Content
+String contentTop = "";
+String contentBottom = "";
+// loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5, low battery: 6
+int contentIcon = 0;
 
 // Set web server port number to 80
 WebServer server(80);
@@ -112,6 +121,15 @@ void setup() {
         1,          /* priority of the task */
         &TaskLED,   /* Task handle to keep track of created task */
         0);         /* pin task to core 0 */
+
+    xTaskCreatePinnedToCore(
+        screenTask,    /* Task function. */
+        "Screen Task", /* name of task. */
+        5000,          /* Stack size of task */
+        NULL,          /* parameter of the task */
+        1,             /* priority of the task */
+        &TaskScreen,   /* Task handle to keep track of created task */
+        0);            /* pin task to core 0 */
 
     printSpacer();
 
@@ -164,9 +182,53 @@ void generalTask(void *pvParameters) {
     int previousMillis = 0;
 
     while (true) {
+        checkBattery();
+
+        if (bootConfigMode) {
+            String networkInfo = "";
+            if (currentMillis - networkInfoPreviousMillis <
+                NETWORK_INFO_INTERVAL) {
+                networkInfo = (String)WiFi.localIP().toString().c_str();
+                contentIcon = 2;
+            } else if ((currentMillis - networkInfoPreviousMillis) <
+                       (NETWORK_INFO_INTERVAL * 2)) {
+                networkInfo = (String)MDNS_NAME + ".local";
+                contentIcon = 2;
+            } else {
+                networkInfo = (String)MDNS_NAME + ".local";
+                networkInfoPreviousMillis = currentMillis;
+                contentIcon = 2;
+            }
+            if (isSoftAPEnabled) {
+                contentIcon = 3;
+            } else if (WiFi.localIP().toString() == "0.0.0.0") {
+                networkInfo = "Connecting to...";
+                contentIcon = 2;
+            }
+            contentTop = networkInfo;
+        } else {
+            String result = "";
+            bool plugged = digitalRead(9);
+            bool charging = tp.IsChargingBattery();
+            if (plugged && charging) {
+                result = "Charging";
+                contentIcon = 4;
+            } else if (plugged) {
+                result = "Plugged in";
+                contentIcon = 5;
+            } else if (batteryPercentage > 100) {
+                result = "Reading battery...";
+            } else {
+                result = "Bat. " + (String)batteryPercentage + "%";
+                contentIcon = 1;
+            }
+
+            contentTop = result;
+        }
+
         // Show connecting message when BLE is disconnected
         while (!bleKeyboard.isConnected()) {
-            renderScreen("Connecting BLE..");
+            contentBottom = "Connecting BLE..";
             breathLEDAnimation();
             checkIdle();
             delay(100);
@@ -174,22 +236,22 @@ void generalTask(void *pvParameters) {
 
         // Show config updated message after keyconfig updated
         if (configUpdated) {
-            renderScreen("Config Updated!");
+            contentBottom = "Config Updated!";
             configUpdated = false;
             delay(1000);
         }
 
         checkIdle();
-        checkBattery();
 
         // Show current pressed key info
         if (updateKeyInfo) {
-            renderScreen(currentKeyInfo);
+            contentBottom = currentKeyInfo;
             updateKeyInfo = false;
         }
+
         // Idle message
         if (currentMillis - sleepPreviousMillis > 5000) {
-            renderScreen("Layout: " + currentLayout);
+            contentBottom = "Layout: " + currentLayout;
         }
 
         // Record boot time every 5 seconds
@@ -227,11 +289,23 @@ void networkTask(void *pvParameters) {
     }
 }
 
+/**
+ * OLED screen related tasks
+ *
+ */
+void screenTask(void *pvParameters) {
+    while (true) {
+        renderScreen();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
 void loop() {
     // Check every keystroke is pressed or not when connected
     while (bleKeyboard.isConnected()) {
         if (keymapsNeedsUpdate) {
             updateKeymaps();
+            showCompleteAnimation = true;
         }
         for (int r = 0; r < ROWS; r++) {
             digitalWrite(outputs[r], LOW);  // Setting one row low
@@ -322,7 +396,7 @@ void initKeys() {
     // Show layout title on screen
     String str = doc[currentLayoutIndex]["title"];
     currentLayout = str;
-    renderScreen("Layout: " + currentLayout);
+    contentBottom = "Layout: " + currentLayout;
     Serial.println("Key layout loaded: " + currentLayout);
 }
 
@@ -486,80 +560,49 @@ void breathLEDAnimation() {
  *
  * @param {char} array to print on oled screen
  */
-void renderScreen(String msg) {
+void renderScreen() {
     // string to char array
-    int n = msg.length();
-    char char_array[n + 1];
-    strcpy(char_array, msg.c_str());
+    int nTop = contentBottom.length();
+    char charArrayTop[nTop];
+    strcpy(charArrayTop, contentBottom.c_str());
 
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
-    u8g2.drawStr(64 - u8g2.getStrWidth(char_array) / 2, 24, char_array);
-    if (bootConfigMode) {
-        String ip_str = "";
-        if (currentMillis - networkInfoPreviousMillis < NETWORK_INFO_INTERVAL) {
-            ip_str = (String)WiFi.localIP().toString().c_str();
-        } else if ((currentMillis - networkInfoPreviousMillis) <
-                   (NETWORK_INFO_INTERVAL * 2)) {
-            ip_str = (String)MDNS_NAME + ".local";
-        } else {
-            ip_str = (String)MDNS_NAME + ".local";
-            networkInfoPreviousMillis = currentMillis;
-        }
-        if (WiFi.localIP().toString() == "0.0.0.0") {
-            ip_str = "Connecting to...";
-        }
-        int n = ip_str.length();
-        char ip_char_array[n + 1];
-        strcpy(ip_char_array, ip_str.c_str());
-        u8g2.drawStr(64 - u8g2.getStrWidth(ip_char_array) / 2, 10,
-                     ip_char_array);
-    } else {
-        String result = "";
-        bool plugged = digitalRead(9);
-        bool charging = tp.IsChargingBattery();
-        u8g2.setFontPosCenter();
-        u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
-        if (plugged && charging) {
-            result = "Charging";
-            u8g2.drawStr((64 - u8g2.getStrWidth("\u0060") / 2) - 32, 10,
-                         "\u0060");
-        } else if (plugged) {
-            result = "Plugged in";
-            u8g2.drawStr((64 - u8g2.getStrWidth("\u0060") / 2) - 32, 10,
-                         "\u0060");
-        } else if (batteryPercentage > 100) {
-            result = "Reading battery...";
-        } else {
-            result = (String)batteryPercentage + "%";
-            if (batteryPercentage > 75) {
-                u8g2.drawStr((64 - u8g2.getStrWidth("\u005B") / 2) - 32, 10,
-                             "\u005B");
-            } else if (batteryPercentage > 50) {
-                u8g2.drawStr((64 - u8g2.getStrWidth("\u005A") / 2) - 32, 10,
-                             "\u005A");
-            } else if (batteryPercentage > 25) {
-                u8g2.drawStr((64 - u8g2.getStrWidth("\u005A") / 2) - 32, 10,
-                             "\u005A");
-            }
-        }
+    u8g2.drawStr(16 + 4, 24, charArrayTop);
 
-        int n = result.length();
-        char char_array[n];
-        strcpy(char_array, result.c_str());
-        u8g2.setFont(u8g2_font_ncenB08_tr);
-        u8g2.setFontPosCenter();
-        u8g2.drawStr((64 - u8g2.getStrWidth(char_array) / 2) + 8, 10,
-                     char_array);
-        u8g2.sendBuffer();
+    int nBottom = contentTop.length();
+    char charArrayBottom[nBottom];
+    strcpy(charArrayBottom, contentTop.c_str());
+    u8g2.setFont(u8g2_font_ncenB08_tr);
+    u8g2.setFontPosCenter();
+    u8g2.drawStr(16 + 4, 10, charArrayBottom);
 
-        if (batteryPercentage <= 20) {
-            isLowBattery = true;
-        } else {
-            isLowBattery = false;
-        }
+    u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
+    switch (contentIcon) {
+        case 0:
+            u8g2.drawGlyph(0, 16, 0xCD);
+            break;
+        case 1:
+            u8g2.drawGlyph(0, 16, 0x5E);
+            break;
+        case 2:
+            u8g2.drawGlyph(0, 16, 0xF7);
+            break;
+        case 3:
+            u8g2.drawGlyph(0, 16, 0x54);
+            break;
+        case 4:
+            u8g2.drawGlyph(0, 16, 0x60);
+            break;
+        case 5:
+            u8g2.drawGlyph(0, 16, 0xAA);
+            break;
+        case 6:
+            u8g2.drawGlyph(0, 16, 0x50);
+            break;
     }
+
     u8g2.sendBuffer();
 }
 
@@ -604,9 +647,9 @@ void goSleeping() {
 void switchBootMode() {
     Serial.println("Resetting...");
     if (!bootConfigMode) {
-        renderScreen("=> Config Mode <=");
+        contentBottom = "Layout: " + currentLayout;
     } else {
-        renderScreen("=> Normal Mode <=");
+        contentBottom = "=> Normal Mode <=";
         WiFi.softAPdisconnect(true);
     }
     bootConfigMode = !bootConfigMode;
@@ -634,6 +677,12 @@ void checkBattery() {
         batteryPercentage > 100) {
         batteryPercentage = getBatteryPercentage();
         batteryPreviousMillis = currentMillis;
+
+        if (batteryPercentage <= 20) {
+            isLowBattery = true;
+        } else {
+            isLowBattery = false;
+        }
     }
     return;
 }
@@ -703,7 +752,7 @@ void initWebServer() {
     const char *password = doc["password"];
 
     // Connect to Wi-Fi network with SSID and password
-    renderScreen((String)ssid);
+    contentBottom = (String)ssid;
     Serial.print("Connecting to ");
     Serial.println(ssid);
     WiFi.mode(WIFI_AP_STA);
@@ -725,6 +774,7 @@ void initWebServer() {
         Serial.println("\nWiFi connect failed! Activating soft AP...");
         WiFi.disconnect();
         WiFi.softAP(AP_SSID, password);
+        isSoftAPEnabled = true;
     } else {
         Serial.println("\nWiFi connected!");
     }
