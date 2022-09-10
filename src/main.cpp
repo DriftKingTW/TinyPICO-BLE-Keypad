@@ -77,8 +77,7 @@ bool isSoftAPEnabled = false;
 // OLED Screen Content
 String contentTop = "";
 String contentBottom = "";
-// loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5,
-// low battery: 6, sleep: 7
+// loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5, low battery: 6
 int contentIcon = 0;
 
 // Set web server port number to 80
@@ -614,9 +613,6 @@ void renderScreen() {
         case 6:
             u8g2.drawGlyph(0, 16, 0x50);
             break;
-        case 7:
-            u8g2.drawGlyph(0, 16, 0xDF);
-            break;
     }
 
     u8g2.sendBuffer();
@@ -647,13 +643,8 @@ int getBatteryPercentage() {
  *
  */
 void goSleeping() {
-    vTaskSuspend(TaskGeneralStatusCheck);
-    contentIcon = 7;
-    contentBottom = "Going to sleep...";
-    delay(500);
-    vTaskSuspend(TaskScreen);
-    delay(500);
-    u8g2.clearDisplay();
+    u8g2.clearBuffer();
+    u8g2.sendBuffer();
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
     gpio_pulldown_en(GPIO_NUM_15);
     // gpio_pulldown_en(GPIO_NUM_27);
