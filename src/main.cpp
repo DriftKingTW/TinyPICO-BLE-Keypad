@@ -277,9 +277,11 @@ void generalTask(void *pvParameters) {
         }
 
         if (showCompleteAnimation) {
+            vTaskSuspend(TaskScreen);
             finishAnimation(u8g2);
             showCompleteAnimation = false;
             contentBottom = "Layout: " + currentLayout;
+            vTaskResume(TaskScreen);
         }
 
         checkIdle();
