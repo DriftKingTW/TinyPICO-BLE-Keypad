@@ -75,12 +75,13 @@ bool showCompleteAnimation = false;
 bool isSoftAPEnabled = false;
 bool isGoingToSleep = false;
 bool clearDisplay = false;
+bool isSwitchingBootMode = false;
 
 // OLED Screen Content
 String contentTop = "";
 String contentBottom = "";
 // loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5,
-// low battery: 6, sleep: 7
+// low battery: 6, sleep: 7, config: 8
 int contentIcon = 0;
 
 // Set web server port number to 80
@@ -259,6 +260,15 @@ void generalTask(void *pvParameters) {
             }
 
             contentTop = result;
+        }
+
+        if (isSwitchingBootMode) {
+            if (!bootConfigMode) {
+                contentIcon = 8;
+                contentBottom = "=> Config Mode <=";
+            } else {
+                contentBottom = "=> Normal Mode <=";
+            }
         }
 
         // Show connecting message when BLE is disconnected
@@ -650,6 +660,9 @@ void renderScreen() {
         case 7:
             u8g2.drawGlyph(0, 16, 0xDF);
             break;
+        case 8:
+            u8g2.drawGlyph(0, 16, 0x11A);
+            break;
         default:
             u8g2.drawGlyph(0, 16, 0x00);
     }
@@ -703,15 +716,15 @@ void goSleeping() {
  *
  */
 void switchBootMode() {
+    isSwitchingBootMode = true;
     Serial.println("Resetting...");
-    if (!bootConfigMode) {
-        contentBottom = "Layout: " + currentLayout;
-    } else {
-        contentBottom = "=> Normal Mode <=";
+    if (bootConfigMode) {
+        WiFi.disconnect();
         WiFi.softAPdisconnect(true);
     }
+    delay(300);
+    esp_sleep_enable_timer_wakeup(1);
     bootConfigMode = !bootConfigMode;
-    esp_sleep_enable_timer_wakeup(100);
     esp_deep_sleep_start();
 }
 
