@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <BleKeyboard.h>
+#include <EEPROM.h>
 #include <ESPmDNS.h>
 #include <SPIFFS.h>
 #include <TinyPICO.h>
@@ -19,6 +20,7 @@
 using namespace std;
 
 #define BAUD_RATE 115200
+#define EEPROM_SIZE 1
 
 #define BLE_NAME "TinyPICO BLE"
 #define AUTHOR "DriftKingTW"

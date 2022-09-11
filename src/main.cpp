@@ -137,6 +137,27 @@ void setup() {
 
     printSpacer();
 
+    Serial.println("Checking if ESP is wakeup from sleep...");
+    esp_sleep_wakeup_cause_t wakeup_reason;
+
+    wakeup_reason = esp_sleep_get_wakeup_cause();
+
+    if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT1) {
+        Serial.println("Strating EEPROM...");
+        EEPROM.begin(EEPROM_SIZE);
+        byte savedLayoutIndex = EEPROM.read(0);
+        if (savedLayoutIndex == 255) {
+            Serial.println("EEPROM is empty, set default layout to 0");
+            EEPROM.write(0, currentLayoutIndex);
+            EEPROM.commit();
+        } else {
+            Serial.println("EEPROM saved layout index: " + savedLayoutIndex);
+            currentLayoutIndex = savedLayoutIndex;
+        }
+    }
+
+    printSpacer();
+
     Serial.println("Loading SPIFFS...");
     if (!SPIFFS.begin(true)) {
         Serial.println("An Error has occurred while mounting SPIFFS");
@@ -417,6 +438,9 @@ void initKeys() {
     String str = doc[currentLayoutIndex]["title"];
     currentLayout = str;
     contentBottom = "Layout: " + currentLayout;
+
+    EEPROM.write(0, currentLayoutIndex);
+    EEPROM.commit();
     Serial.println("Key layout loaded: " + currentLayout);
 }
 
