@@ -20,7 +20,9 @@
 using namespace std;
 
 #define BAUD_RATE 115200
-#define EEPROM_SIZE 1
+#define EEPROM_SIZE 2
+#define EEPROM_ADDR_LAYOUT 0
+#define EEPROM_ADDR_DEVICE 1
 
 #define BLE_NAME "TinyPICO BLE"
 #define AUTHOR "DriftKingTW"

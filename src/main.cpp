@@ -38,6 +38,7 @@ String currentKeyInfo = "";
 bool updateKeyInfo = false;
 bool isFnKeyPressed = false;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
+RTC_DATA_ATTR byte currentActiveDevice = 0;
 byte layoutLength = 0;
 String currentLayout = "";
 // For maximum 10 layers
@@ -98,6 +99,7 @@ void setup() {
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
+    bleKeyboard.set_current_active_device(currentActiveDevice);
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
@@ -146,15 +148,25 @@ void setup() {
     if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT1) {
         Serial.println("Strating EEPROM...");
         EEPROM.begin(EEPROM_SIZE);
-        byte savedLayoutIndex = EEPROM.read(0);
+        byte savedLayoutIndex = EEPROM.read(EEPROM_ADDR_LAYOUT);
         if (savedLayoutIndex == 255) {
             Serial.println("EEPROM is empty, set default layout to 0");
-            EEPROM.write(0, currentLayoutIndex);
-            EEPROM.commit();
+            EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
         } else {
             Serial.println("EEPROM saved layout index: " + savedLayoutIndex);
             currentLayoutIndex = savedLayoutIndex;
         }
+
+        byte savedActiveDevice = EEPROM.read(EEPROM_ADDR_DEVICE);
+        if (savedActiveDevice == 255) {
+            Serial.println("EEPROM is empty, set default active device to 0");
+            EEPROM.write(EEPROM_ADDR_DEVICE, currentActiveDevice);
+        } else {
+            Serial.println("EEPROM saved layout index: " + savedActiveDevice);
+            currentActiveDevice = savedActiveDevice;
+        }
+
+        EEPROM.commit();
     }
 
     printSpacer();
@@ -355,53 +367,65 @@ void screenTask(void *pvParameters) {
 
 void loop() {
     // Check every keystroke is pressed or not when connected
-    while (bleKeyboard.isConnected()) {
-        if (keymapsNeedsUpdate) {
-            updateKeymaps();
-            showCompleteAnimation = true;
-        }
-        for (int r = 0; r < ROWS; r++) {
-            digitalWrite(outputs[r], LOW);  // Setting one row low
-            for (int c = 0; c < COLS; c++) {
-                if (digitalRead(inputs[c]) == ACTIVE) {
-                    resetIdle();
-                    if (isFnKeyPressed) {
-                        if (r == 0 && c == 0) {
-                            goSleeping();
-                        } else if (r == 1 && c == 0) {
-                            switchBootMode();
-                        } else if (r == 4 && c == 4) {
-                            // Switch layout
-                            currentLayoutIndex =
-                                currentLayoutIndex < layoutLength - 1
-                                    ? currentLayoutIndex + 1
-                                    : 0;
-                            initKeys();
-                            delay(300);
+    if (keymapsNeedsUpdate) {
+        updateKeymaps();
+        showCompleteAnimation = true;
+    }
+    for (int r = 0; r < ROWS; r++) {
+        digitalWrite(outputs[r], LOW);  // Setting one row low
+        for (int c = 0; c < COLS; c++) {
+            if (digitalRead(inputs[c]) == ACTIVE) {
+                resetIdle();
+                if (isFnKeyPressed) {
+                    if (r == 0 && c == 0) {
+                        goSleeping();
+                    } else if (r == 1 && c == 0) {
+                        switchBootMode();
+                    } else if (r == 3 && c == 0) {
+                        if (bleKeyboard.getCounnectedCount() > 1) {
+                            currentActiveDevice =
+                                currentActiveDevice == 0 ? 1 : 0;
+                        } else {
+                            currentActiveDevice = 0;
                         }
-                    } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
-                        // Macro press
-                        size_t index =
-                            keyMap[r][c]
-                                .keyInfo
-                                .substring(6, sizeof(keyMap[r][c].keyInfo) - 1)
-                                .toInt();
-                        macroPress(macroMap[index]);
-                    } else {
-                        // Standard key press
-                        keyPress(keyMap[r][c]);
+                        bleKeyboard.set_current_active_device(
+                            currentActiveDevice);
+                        contentBottom = "Device " + (String)currentActiveDevice;
+                        Serial.println("Switching to device " +
+                                       (String)currentActiveDevice);
+                        EEPROM.write(EEPROM_ADDR_DEVICE, currentActiveDevice);
+                        EEPROM.commit();
+                        delay(300);
+                    } else if (r == 4 && c == 4) {
+                        // Switch layout
+                        currentLayoutIndex =
+                            currentLayoutIndex < layoutLength - 1
+                                ? currentLayoutIndex + 1
+                                : 0;
+                        initKeys();
+                        delay(300);
                     }
+                } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
+                    // Macro press
+                    size_t index =
+                        keyMap[r][c]
+                            .keyInfo
+                            .substring(6, sizeof(keyMap[r][c].keyInfo) - 1)
+                            .toInt();
+                    macroPress(macroMap[index]);
                 } else {
-                    keyRelease(keyMap[r][c]);
+                    // Standard key press
+                    keyPress(keyMap[r][c]);
                 }
-                delayMicroseconds(10);
+            } else {
+                keyRelease(keyMap[r][c]);
             }
-            digitalWrite(outputs[r], HIGH);  // Setting the row back to high
             delayMicroseconds(10);
         }
-        delay(10);
+        digitalWrite(outputs[r], HIGH);  // Setting the row back to high
+        delayMicroseconds(10);
     }
-    delay(100);
+    delay(10);
 }
 
 /**
@@ -451,7 +475,7 @@ void initKeys() {
     currentLayout = str;
     contentBottom = "Layout: " + currentLayout;
 
-    EEPROM.write(0, currentLayoutIndex);
+    EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
     EEPROM.commit();
     Serial.println("Key layout loaded: " + currentLayout);
 }
