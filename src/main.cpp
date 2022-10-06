@@ -365,6 +365,10 @@ void screenTask(void *pvParameters) {
     }
 }
 
+/**
+ * Main loop for keyboard matrix scan
+ *
+ */
 void loop() {
     // Check every keystroke is pressed or not when connected
     if (keymapsNeedsUpdate) {
@@ -382,28 +386,9 @@ void loop() {
                     } else if (r == 1 && c == 0) {
                         switchBootMode();
                     } else if (r == 3 && c == 0) {
-                        if (bleKeyboard.getCounnectedCount() > 1) {
-                            currentActiveDevice =
-                                currentActiveDevice == 0 ? 1 : 0;
-                        } else {
-                            currentActiveDevice = 0;
-                        }
-                        bleKeyboard.set_current_active_device(
-                            currentActiveDevice);
-                        contentBottom = "Device " + (String)currentActiveDevice;
-                        Serial.println("Switching to device " +
-                                       (String)currentActiveDevice);
-                        EEPROM.write(EEPROM_ADDR_DEVICE, currentActiveDevice);
-                        EEPROM.commit();
-                        delay(300);
+                        switchDevice();
                     } else if (r == 4 && c == 4) {
-                        // Switch layout
-                        currentLayoutIndex =
-                            currentLayoutIndex < layoutLength - 1
-                                ? currentLayoutIndex + 1
-                                : 0;
-                        initKeys();
-                        delay(300);
+                        switchLayout();
                     }
                 } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
                     // Macro press
@@ -585,6 +570,35 @@ void macroPress(Macro &macro) {
         bleKeyboard.println(macro.stringContent);
     }
     delay(100);
+}
+
+/**
+ * Switch keymap layout
+ *
+ */
+void switchLayout() {
+    currentLayoutIndex =
+        currentLayoutIndex < layoutLength - 1 ? currentLayoutIndex + 1 : 0;
+    initKeys();
+    delay(300);
+}
+
+/**
+ * Switch active bluetooth device
+ *
+ */
+void switchDevice() {
+    if (bleKeyboard.getCounnectedCount() > 1) {
+        currentActiveDevice = currentActiveDevice == 0 ? 1 : 0;
+    } else {
+        currentActiveDevice = 0;
+    }
+    bleKeyboard.set_current_active_device(currentActiveDevice);
+    contentBottom = "Device " + (String)currentActiveDevice;
+    Serial.println("Switching to device " + (String)currentActiveDevice);
+    EEPROM.write(EEPROM_ADDR_DEVICE, currentActiveDevice);
+    EEPROM.commit();
+    delay(300);
 }
 
 /**

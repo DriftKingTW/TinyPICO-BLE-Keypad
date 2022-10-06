@@ -10,11 +10,11 @@
 #include <WiFi.h>
 
 #include <algorithm>
+#include <animation.hpp>
 #include <cstring>
 #include <fstream>
 #include <helper.hpp>
 #include <iterator>
-#include <animation.hpp>
 #include <string>
 
 using namespace std;
@@ -63,6 +63,8 @@ void updateKeymaps();
 void keyPress(Key &key);
 void keyRelease(Key &key);
 void macroPress(Macro &macro);
+void switchLayout();
+void switchDevice();
 
 // OLED Control
 void renderScreen();
