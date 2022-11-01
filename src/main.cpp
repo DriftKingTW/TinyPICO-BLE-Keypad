@@ -719,7 +719,7 @@ void renderScreen() {
  *
  */
 int getBatteryPercentage() {
-    const float minVoltage = 3.3, fullVolatge = 4.2;
+    const float minVoltage = 3.3, fullVolatge = 4.1;
     float batteryVoltage = tp.GetBatteryVoltage();
 
     Serial.println((String) "Battery Voltage: " + batteryVoltage);
