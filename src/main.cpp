@@ -1080,6 +1080,7 @@ void initWebServer() {
             res["message"] = "failed to create file";
             serializeJson(res, buffer);
             server.send(400, "application/json", buffer);
+            config.close();
             return;
         }
 
