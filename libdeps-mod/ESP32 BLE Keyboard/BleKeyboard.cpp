@@ -2,6 +2,7 @@
 
 #include <vector>
 #if defined(USE_NIMBLE)
+#include <NimBLEConnInfo.h>
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
 #include <NimBLEServer.h>
@@ -162,6 +163,10 @@ void BleKeyboard::begin(void) {
 void BleKeyboard::end(void) {}
 
 size_t BleKeyboard::getCounnectedCount(void) { return this->connectedCount; }
+
+std::array<std::string, 2> BleKeyboard::getDevicesAddress(void) {
+    return this->devicesAddress;
+}
 
 bool BleKeyboard::isConnected(void) { return this->connected; }
 
@@ -510,6 +515,9 @@ void BleKeyboard::onConnect(BLEServer* pServer) {
     vector<uint16_t> peerDevices = pServer->getPeerDevices();
     for (size_t i = 0; i < peerDevices.size(); ++i) {
         ESP_LOGD(LOG_TAG, "Device descriptor: %u", peerDevices.at(i));
+        NimBLEConnInfo info = pServer->getPeerInfo(peerDevices.at(i));
+        this->devicesAddress[i] = info.getAddress().toString();
+        ESP_LOGD(LOG_TAG, "Device address: %s", this->devicesAddress[i].c_str());
     }
 
     ESP_LOGD(LOG_TAG, "Connected client count: %u",
