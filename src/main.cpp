@@ -228,7 +228,8 @@ void generalTask(void *pvParameters) {
     while (true) {
         checkBattery();
 
-        if (isDetectingLastConnectedDevice && bleKeyboard.isConnected()) {
+        if (isDetectingLastConnectedDevice && bleKeyboard.isConnected() &&
+            bleKeyboard.getCounnectedCount() > 1) {
             isDetectingLastConnectedDevice = false;
             std::array<std::string, 2> addresses =
                 bleKeyboard.getDevicesAddress();
