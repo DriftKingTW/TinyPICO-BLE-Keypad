@@ -37,8 +37,10 @@ String keyMapJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
 bool updateKeyInfo = false;
 bool isFnKeyPressed = false;
+bool isDetectingLastConnectedDevice = true;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
 RTC_DATA_ATTR byte currentActiveDevice = 0;
+RTC_DATA_ATTR String currentActiveDeviceAddress = "";
 byte layoutLength = 0;
 String currentLayout = "";
 // For maximum 10 layers
@@ -106,6 +108,36 @@ void setup() {
 
     printSpacer();
 
+    Serial.println("Loading SPIFFS...");
+    if (!SPIFFS.begin(true)) {
+        Serial.println("An Error has occurred while mounting SPIFFS");
+        return;
+    }
+
+    Serial.print("SPIFFS Free: ");
+    Serial.println(
+        humanReadableSize((SPIFFS.totalBytes() - SPIFFS.usedBytes())));
+    Serial.print("SPIFFS Used: ");
+    Serial.println(humanReadableSize(SPIFFS.usedBytes()));
+    Serial.print("SPIFFS Total: ");
+    Serial.println(humanReadableSize(SPIFFS.totalBytes()));
+
+    Serial.println(listFiles());
+
+    Serial.println("Loading config files from SPIFFS...");
+    keyMapJSON = loadJSONFileAsString("keyconfig");
+    macroMapJSON = loadJSONFileAsString("macros");
+
+    StaticJsonDocument<256> doc;
+    String configJSON = loadJSONFileAsString("config");
+    deserializeJson(doc, configJSON);
+    String address = doc["currentActiveDeviceAddress"];
+    currentActiveDeviceAddress = address;
+    Serial.println("Last connected device BLE address: " +
+                   currentActiveDeviceAddress);
+
+    printSpacer();
+
     Serial.println("Configuring ext1 wakeup source...");
     esp_sleep_enable_ext1_wakeup(WAKEUP_KEY_BITMAP, ESP_EXT1_WAKEUP_ANY_HIGH);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
@@ -152,44 +184,12 @@ void setup() {
         if (savedLayoutIndex == 255) {
             Serial.println("EEPROM is empty, set default layout to 0");
             EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
+            EEPROM.commit();
         } else {
             Serial.println("EEPROM saved layout index: " + savedLayoutIndex);
             currentLayoutIndex = savedLayoutIndex;
         }
-
-        byte savedActiveDevice = EEPROM.read(EEPROM_ADDR_DEVICE);
-        if (savedActiveDevice == 255) {
-            Serial.println("EEPROM is empty, set default active device to 0");
-            EEPROM.write(EEPROM_ADDR_DEVICE, currentActiveDevice);
-        } else {
-            Serial.println("EEPROM saved layout index: " + savedActiveDevice);
-            currentActiveDevice = savedActiveDevice;
-        }
-
-        EEPROM.commit();
     }
-
-    printSpacer();
-
-    Serial.println("Loading SPIFFS...");
-    if (!SPIFFS.begin(true)) {
-        Serial.println("An Error has occurred while mounting SPIFFS");
-        return;
-    }
-
-    Serial.print("SPIFFS Free: ");
-    Serial.println(
-        humanReadableSize((SPIFFS.totalBytes() - SPIFFS.usedBytes())));
-    Serial.print("SPIFFS Used: ");
-    Serial.println(humanReadableSize(SPIFFS.usedBytes()));
-    Serial.print("SPIFFS Total: ");
-    Serial.println(humanReadableSize(SPIFFS.totalBytes()));
-
-    Serial.println(listFiles());
-
-    Serial.println("Loading config files from SPIFFS...");
-    keyMapJSON = loadJSONFileAsString("keyconfig");
-    macroMapJSON = loadJSONFileAsString("macros");
 
     printSpacer();
 
@@ -227,6 +227,31 @@ void generalTask(void *pvParameters) {
 
     while (true) {
         checkBattery();
+
+        if (isDetectingLastConnectedDevice && bleKeyboard.isConnected() &&
+            bleKeyboard.getCounnectedCount() > 1) {
+            isDetectingLastConnectedDevice = false;
+            std::array<std::string, 2> addresses =
+                bleKeyboard.getDevicesAddress();
+            for (int i = 0; i < addresses.size(); i++) {
+                if (!currentActiveDeviceAddress.length()) {
+                    currentActiveDeviceAddress = String(addresses[i].c_str());
+                    StaticJsonDocument<128> doc;
+                    if (SPIFFS.begin()) {
+                        File config = SPIFFS.open("/config.json", "w");
+                        doc["currentActiveDeviceAddress"] =
+                            currentActiveDeviceAddress;
+                        serializeJson(doc, config);
+                        config.close();
+                    }
+                }
+                if (currentActiveDeviceAddress.equals(
+                        String(addresses[i].c_str()))) {
+                    currentActiveDevice = i;
+                }
+                bleKeyboard.set_current_active_device(currentActiveDevice);
+            }
+        }
 
         // Update screen info
         if (isGoingToSleep) {
@@ -593,11 +618,19 @@ void switchDevice() {
     } else {
         currentActiveDevice = 0;
     }
+    std::array<std::string, 2> addresses = bleKeyboard.getDevicesAddress();
+    currentActiveDeviceAddress = String(addresses[currentActiveDevice].c_str());
     bleKeyboard.set_current_active_device(currentActiveDevice);
     contentBottom = "Device " + (String)currentActiveDevice;
     Serial.println("Switching to device " + (String)currentActiveDevice);
-    EEPROM.write(EEPROM_ADDR_DEVICE, currentActiveDevice);
-    EEPROM.commit();
+    Serial.println("Address: " + (String)currentActiveDeviceAddress);
+    if (SPIFFS.begin()) {
+        StaticJsonDocument<128> doc;
+        File config = SPIFFS.open("/config.json", "w");
+        doc["currentActiveDeviceAddress"] = currentActiveDeviceAddress;
+        serializeJson(doc, config);
+        config.close();
+    }
     delay(300);
 }
 

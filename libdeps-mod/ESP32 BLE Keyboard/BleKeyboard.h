@@ -136,7 +136,8 @@ private:
   BLECharacteristic* outputKeyboard;
   BLECharacteristic* inputMediaKeys;
   BLEAdvertising*    advertising;
-  KeyReport          _keyReport;
+  std::array<std::string, 2> devicesAddress;
+  KeyReport _keyReport;
   MediaKeyReport     _mediaKeyReport;
   std::string        deviceName;
   std::string        deviceManufacturer;
@@ -159,6 +160,7 @@ public:
  void begin(void);
  void end(void);
  size_t getCounnectedCount(void);
+ std::array<std::string, 2> getDevicesAddress(void);
  void sendReport(KeyReport* keys);
  void sendReport(MediaKeyReport* keys);
  size_t press(uint8_t k);
