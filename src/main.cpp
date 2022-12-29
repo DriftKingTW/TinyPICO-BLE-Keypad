@@ -1,7 +1,7 @@
 #include <main.hpp>
 
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
-RTC_DATA_ATTR bool bootConfigMode = false;
+RTC_DATA_ATTR bool bootWiFiMode = false;
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
                                             /* reset=*/U8X8_PIN_NONE);
@@ -199,7 +199,7 @@ void setup() {
 
     printSpacer();
 
-    if (bootConfigMode) {
+    if (bootWiFiMode) {
         initWebServer();
     } else {
         setCPUFrequency(80);
@@ -219,7 +219,7 @@ void setup() {
 void generalTask(void *pvParameters) {
     int previousMillis = 0;
 
-    // if (bootConfigMode) {
+    // if (bootWiFiMode) {
     //     networkAnimation(u8g2);
     // } else {
     //     loadingAnimation(u8g2);
@@ -257,7 +257,7 @@ void generalTask(void *pvParameters) {
         if (isGoingToSleep) {
             contentBottom = "Going to sleep";
             contentIcon = 7;
-        } else if (bootConfigMode) {
+        } else if (bootWiFiMode) {
             String networkInfo = "";
             if (currentMillis - networkInfoPreviousMillis <
                 NETWORK_INFO_INTERVAL) {
@@ -300,9 +300,9 @@ void generalTask(void *pvParameters) {
         }
 
         if (isSwitchingBootMode) {
-            if (!bootConfigMode) {
+            if (!bootWiFiMode) {
                 contentIcon = 8;
-                contentBottom = "=> Config Mode <=";
+                contentBottom = "=> WiFi Mode <=";
             } else {
                 contentBottom = "=> Normal Mode <=";
             }
@@ -789,13 +789,13 @@ void goSleeping() {
 void switchBootMode() {
     isSwitchingBootMode = true;
     Serial.println("Resetting...");
-    if (bootConfigMode) {
+    if (bootWiFiMode) {
         WiFi.disconnect();
         WiFi.softAPdisconnect(true);
     }
     delay(300);
     esp_sleep_enable_timer_wakeup(1);
-    bootConfigMode = !bootConfigMode;
+    bootWiFiMode = !bootWiFiMode;
     esp_deep_sleep_start();
 }
 
