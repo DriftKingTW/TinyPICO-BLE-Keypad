@@ -325,7 +325,7 @@ void generalTask(void *pvParameters) {
 
         if (showCompleteAnimation) {
             vTaskSuspend(TaskScreen);
-            finishAnimation(u8g2);
+            // finishAnimation(u8g2);
             showCompleteAnimation = false;
             contentBottom = "Layout: " + currentLayout;
             vTaskResume(TaskScreen);
@@ -606,6 +606,31 @@ void switchLayout() {
         currentLayoutIndex < layoutLength - 1 ? currentLayoutIndex + 1 : 0;
     initKeys();
     delay(300);
+}
+
+// overload switchLayout() to accept layout index as parameter
+void switchLayout(int layoutIndex) {
+    currentLayoutIndex = layoutIndex;
+    initKeys();
+}
+
+// input layout name as string and find the index of that layout
+int findLayoutIndex(String layoutName) {
+    DynamicJsonDocument doc(jsonDocSize);
+    DeserializationError err = deserializeJson(
+        doc, keyMapJSON, DeserializationOption::NestingLimit(5));
+    if (err) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(err.c_str());
+    }
+    size_t layoutLength = doc.size();
+    for (size_t i = 0; i < layoutLength; i++) {
+        String str = doc[i]["title"];
+        if (str.equalsIgnoreCase(layoutName)) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 /**
@@ -1049,6 +1074,44 @@ void initWebServer() {
             keymapsNeedsUpdate = true;
             return;
         }
+    });
+
+    server.on("/api/layout", HTTP_POST, []() {
+        if (server.hasArg("plain") == false) {
+            // Handle error here
+            Serial.println("Arg Error");
+        }
+        String type = server.arg("type");
+        String body = server.arg("plain");
+        DynamicJsonDocument res(4096);
+        String buffer;
+        // Handle incoming JSON data
+        DynamicJsonDocument doc(4096);
+        deserializeJson(doc, body);
+
+        // Return error if config is overflowed
+        if (doc.overflowed()) {
+            res["message"] = "overflowed";
+            serializeJson(res, buffer);
+            server.send(400, "application/json", buffer);
+            return;
+        }
+
+        // Change current layout by layout title
+        int index = findLayoutIndex(doc["layout"].as<String>());
+        if(index == -1) {
+            res["message"] = "layout not found";
+            serializeJson(res, buffer);
+            server.send(400, "application/json", buffer);
+            return;
+        }
+        switchLayout(index);
+
+        res["message"] = doc["layout"].as<String>();
+        serializeJson(res, buffer);
+        server.send(200, "application/json", buffer);
+        keymapsNeedsUpdate = true;
+        return;
     });
 
     server.on("/api/config", HTTP_OPTIONS, sendCrossOriginHeader);

@@ -63,6 +63,8 @@ void keyPress(Key &key);
 void keyRelease(Key &key);
 void macroPress(Macro &macro);
 void switchLayout();
+void switchLayout(int layoutIndex);
+int findLayoutIndex(String layoutName);
 void switchDevice();
 
 // OLED Control
