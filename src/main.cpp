@@ -74,17 +74,18 @@ int batteryPercentage = 101;
 
 bool keymapsNeedsUpdate = false;
 bool configUpdated = false;
-bool showCompleteAnimation = false;
 bool isSoftAPEnabled = false;
 bool isGoingToSleep = false;
 bool clearDisplay = false;
 bool isSwitchingBootMode = false;
+bool isCaffeinated = false;
+bool isOutputLocked = false;
 
 // OLED Screen Content
 String contentTop = "";
 String contentBottom = "";
 // loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5,
-// low battery: 6, sleep: 7, config: 8
+// low battery: 6, sleep: 7, config: 8, caffeinated: 9
 int contentIcon = 0;
 
 // Set web server port number to 80
@@ -257,6 +258,10 @@ void generalTask(void *pvParameters) {
         if (isGoingToSleep) {
             contentBottom = "Going to sleep";
             contentIcon = 7;
+        } else if (isOutputLocked) {
+            contentIcon = 10;
+        } else if (isCaffeinated) {
+            contentIcon = 9;
         } else if (bootWiFiMode) {
             String networkInfo = "";
             if (currentMillis - networkInfoPreviousMillis <
@@ -321,14 +326,6 @@ void generalTask(void *pvParameters) {
             contentBottom = "Config Updated!";
             configUpdated = false;
             delay(1000);
-        }
-
-        if (showCompleteAnimation) {
-            vTaskSuspend(TaskScreen);
-            // finishAnimation(u8g2);
-            showCompleteAnimation = false;
-            contentBottom = "Layout: " + currentLayout;
-            vTaskResume(TaskScreen);
         }
 
         checkIdle();
@@ -398,7 +395,6 @@ void loop() {
     // Check every keystroke is pressed or not when connected
     if (keymapsNeedsUpdate) {
         updateKeymaps();
-        showCompleteAnimation = true;
     }
     for (int r = 0; r < ROWS; r++) {
         digitalWrite(outputs[r], LOW);  // Setting one row low
@@ -414,6 +410,12 @@ void loop() {
                         switchDevice();
                     } else if (r == 4 && c == 4) {
                         switchLayout();
+                    } else if (r == 3 && c == 3) {
+                        isCaffeinated = !isCaffeinated;
+                        delay(300);
+                    } else if (r == 3 && c == 4) {
+                        isOutputLocked = !isOutputLocked;
+                        delay(300);
                     }
                 } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
                     // Macro press
@@ -546,7 +548,7 @@ void keyPress(Key &key) {
     if (key.keyInfo == "FN") {
         isFnKeyPressed = true;
     }
-    if (key.state == false) {
+    if (key.state == false && !isOutputLocked) {
         bleKeyboard.press(key.keyStroke);
     }
     key.state = true;
@@ -563,7 +565,7 @@ void keyRelease(Key &key) {
     if (key.keyInfo == "FN") {
         isFnKeyPressed = false;
     }
-    if (key.state == true) {
+    if (key.state == true && !isOutputLocked) {
         bleKeyboard.release(key.keyStroke);
     }
     key.state = false;
@@ -759,6 +761,12 @@ void renderScreen() {
         case 8:
             u8g2.drawGlyph(0, 16, 0x11A);
             break;
+        case 9:
+            u8g2.drawGlyph(0, 16, 0xCA);
+            break;
+        case 10:
+            u8g2.drawGlyph(0, 16, 0xA5);
+            break;
         default:
             u8g2.drawGlyph(0, 16, 0x00);
     }
@@ -830,7 +838,8 @@ void switchBootMode() {
  *
  */
 void checkIdle() {
-    if (currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
+    if (!isCaffeinated &&
+        currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
         goSleeping();
     }
 }
@@ -1099,7 +1108,7 @@ void initWebServer() {
 
         // Change current layout by layout title
         int index = findLayoutIndex(doc["layout"].as<String>());
-        if(index == -1) {
+        if (index == -1) {
             res["message"] = "layout not found";
             serializeJson(res, buffer);
             server.send(400, "application/json", buffer);
