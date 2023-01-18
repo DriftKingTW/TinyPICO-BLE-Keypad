@@ -3,6 +3,7 @@
 #include <BleKeyboard.h>
 #include <EEPROM.h>
 #include <ESPmDNS.h>
+#include <PCF8574.h>
 #include <SPIFFS.h>
 #include <TinyPICO.h>
 #include <U8g2lib.h>
@@ -54,6 +55,7 @@ void ledTask(void *);
 void generalTask(void *);
 void networkTask(void *);
 void screenTask(void *);
+void ICACHE_RAM_ATTR encoderTask(void *);
 
 // Keyboard
 void initKeys();

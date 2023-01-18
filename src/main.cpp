@@ -1,5 +1,21 @@
 #include <main.hpp>
 
+// Rotary Encoder Inputs
+#define CLK P5
+#define DT P4
+#define SW P6
+
+PCF8574 pcf8574(0x38);
+
+int rotaryEncoderCounter = 0;
+int rotaryEncoderCurrentStateCLK;
+int rotaryEncoderLastStateCLK;
+String rotaryEncoderCurrentDir = "";
+unsigned long rotaryEncoderLastButtonPress = 0;
+
+long unsigned int rotaryEncoderDebounce = 0;
+bool rotaryEncoderChange = false;
+
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR bool bootWiFiMode = false;
 
@@ -12,6 +28,7 @@ TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
 TaskHandle_t TaskScreen;
+TaskHandle_t TaskEncoder;
 
 // Stucture for key stroke
 Key key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
@@ -100,6 +117,20 @@ void setup() {
 
     printSpacer();
 
+    // Set encoder pins as inputs
+    pcf8574.pinMode(CLK, INPUT);
+    pcf8574.pinMode(DT, INPUT);
+    pcf8574.pinMode(SW, INPUT_PULLUP);
+
+    pcf8574.setLatency(0);
+    // Start library
+    pcf8574.begin();
+
+    rotaryEncoderDebounce = millis();
+
+    // Read the initial state of CLK
+    rotaryEncoderLastStateCLK = pcf8574.digitalRead(CLK);
+
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
     bleKeyboard.set_current_active_device(currentActiveDevice);
@@ -170,6 +201,14 @@ void setup() {
         1,             /* priority of the task */
         &TaskScreen,   /* Task handle to keep track of created task */
         0);            /* pin task to core 0 */
+
+    xTaskCreate(encoderTask,    /* Task function. */
+                "Encoder Task", /* name of task. */
+                5000,           /* Stack size of task */
+                NULL,           /* parameter of the task */
+                1,              /* priority of the task */
+                &TaskEncoder    /* Task handle to keep track of created task */
+    );                          /* pin task to core 0 */
 
     printSpacer();
 
@@ -384,6 +423,62 @@ void screenTask(void *pvParameters) {
     while (true) {
         renderScreen();
         vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+/**
+ * Rotary encoder related tasks
+ *
+ */
+void encoderTask(void *pvParameters) {
+    while (true) {
+        // Read the current state of CLK
+        rotaryEncoderCurrentStateCLK = pcf8574.digitalRead(CLK);
+
+        // If last and current state of CLK are different, then pulse
+        // occurred React to only 1 state rotaryEncoderChange to avoid double
+        // count
+        if (rotaryEncoderCurrentStateCLK != rotaryEncoderLastStateCLK &&
+            rotaryEncoderCurrentStateCLK == HIGH) {
+            // If the DT state is different than the CLK state then
+            // the encoder is rotating CCW so decrement
+            if (pcf8574.digitalRead(DT) != rotaryEncoderCurrentStateCLK) {
+                if (!(rotaryEncoderCurrentDir == "CCW" &&
+                      millis() - rotaryEncoderDebounce < 50)) {
+                    // Encoder is rotating CW so increment
+                    rotaryEncoderCounter++;
+                    rotaryEncoderCurrentDir = "CW";
+                    rotaryEncoderDebounce = millis();
+                    bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
+                }
+            } else {
+                if (!(rotaryEncoderCurrentDir == "CW" &&
+                      millis() - rotaryEncoderDebounce < 50)) {
+                    rotaryEncoderCounter--;
+                    rotaryEncoderCurrentDir = "CCW";
+                    rotaryEncoderDebounce = millis();
+                    bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
+                }
+            }
+            Serial.print("Direction: ");
+            Serial.print(rotaryEncoderCurrentDir);
+            Serial.print(" | Counter: ");
+            Serial.println(rotaryEncoderCounter);
+        }
+
+        // Remember last CLK state
+        rotaryEncoderLastStateCLK = rotaryEncoderCurrentStateCLK;
+
+        int btnState = pcf8574.digitalRead(SW);
+
+        if (btnState == LOW) {
+            if (millis() - rotaryEncoderLastButtonPress > 50) {
+                Serial.println("Button pressed!");
+                bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+            }
+            rotaryEncoderLastButtonPress = millis();
+        }
+        vTaskDelay(2 / portTICK_PERIOD_MS);
     }
 }
 
