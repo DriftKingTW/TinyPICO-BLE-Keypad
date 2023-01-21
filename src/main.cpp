@@ -1,9 +1,9 @@
 #include <main.hpp>
 
 // Rotary Encoder Inputs
-#define CLK P5
-#define DT P4
-#define SW P6
+#define encoderPinA P5
+#define encoderPinB P4
+#define encoderSW P6
 
 PCF8574 pcf8574(0x38);
 
@@ -118,9 +118,8 @@ void setup() {
     printSpacer();
 
     // Set encoder pins as inputs
-    pcf8574.pinMode(CLK, INPUT);
-    pcf8574.pinMode(DT, INPUT);
-    pcf8574.pinMode(SW, INPUT_PULLUP);
+    pcf8574.encoder(encoderPinA, encoderPinB);
+    pcf8574.pinMode(encoderSW, INPUT_PULLUP);
 
     pcf8574.setLatency(0);
     // Start library
@@ -129,7 +128,7 @@ void setup() {
     rotaryEncoderDebounce = millis();
 
     // Read the initial state of CLK
-    rotaryEncoderLastStateCLK = pcf8574.digitalRead(CLK);
+    rotaryEncoderLastStateCLK = pcf8574.digitalRead(encoderPinA);
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
@@ -433,7 +432,7 @@ void screenTask(void *pvParameters) {
 void encoderTask(void *pvParameters) {
     while (true) {
         // Read the current state of CLK
-        rotaryEncoderCurrentStateCLK = pcf8574.digitalRead(CLK);
+        rotaryEncoderCurrentStateCLK = pcf8574.digitalRead(encoderPinA);
 
         // If last and current state of CLK are different, then pulse
         // occurred React to only 1 state rotaryEncoderChange to avoid double
@@ -442,7 +441,7 @@ void encoderTask(void *pvParameters) {
             rotaryEncoderCurrentStateCLK == HIGH) {
             // If the DT state is different than the CLK state then
             // the encoder is rotating CCW so decrement
-            if (pcf8574.digitalRead(DT) != rotaryEncoderCurrentStateCLK) {
+            if (pcf8574.digitalRead(encoderPinB) != rotaryEncoderCurrentStateCLK) {
                 if (!(rotaryEncoderCurrentDir == "CCW" &&
                       millis() - rotaryEncoderDebounce < 50)) {
                     // Encoder is rotating CW so increment
@@ -469,7 +468,7 @@ void encoderTask(void *pvParameters) {
         // Remember last CLK state
         rotaryEncoderLastStateCLK = rotaryEncoderCurrentStateCLK;
 
-        int btnState = pcf8574.digitalRead(SW);
+        int btnState = pcf8574.digitalRead(encoderSW);
 
         if (btnState == LOW) {
             if (millis() - rotaryEncoderLastButtonPress > 50) {
