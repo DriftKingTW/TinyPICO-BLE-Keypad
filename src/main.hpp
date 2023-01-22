@@ -9,6 +9,7 @@
 #include <U8g2lib.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <Wire.h>
 
 #include <algorithm>
 #include <animation.hpp>
@@ -36,6 +37,19 @@ using namespace std;
 #define ROWS 5
 #define COLS 7
 
+// ====== Expansion Board Pin Definition ======
+
+// Rotary Encoder Expansion Board
+#define encoderPinA P5
+#define encoderPinB P4
+#define encoderSW P6
+#define expansionBtn1 P0
+#define expansionBtn2 P1
+#define expansionBtn3 P2
+#define ENCODER_EXPANSION_ADDR 0x38
+
+// ====== End Expansion Board Pin Definition ======
+
 struct Key {
     uint8_t keyStroke;
     bool state;
@@ -56,6 +70,7 @@ void generalTask(void *);
 void networkTask(void *);
 void screenTask(void *);
 void ICACHE_RAM_ATTR encoderTask(void *);
+void i2cScannerTask(void *);
 
 // Keyboard
 void initKeys();

@@ -1,21 +1,5 @@
 #include <main.hpp>
 
-// Rotary Encoder Inputs
-#define encoderPinA P5
-#define encoderPinB P4
-#define encoderSW P6
-
-PCF8574 pcf8574(0x38);
-
-int rotaryEncoderCounter = 0;
-int rotaryEncoderCurrentStateCLK;
-int rotaryEncoderLastStateCLK;
-String rotaryEncoderCurrentDir = "";
-unsigned long rotaryEncoderLastButtonPress = 0;
-
-long unsigned int rotaryEncoderDebounce = 0;
-bool rotaryEncoderChange = false;
-
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR bool bootWiFiMode = false;
 
@@ -24,11 +8,15 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 TinyPICO tp = TinyPICO();
 
+PCF8574 pcf8574RotaryExpansion(ENCODER_EXPANSION_ADDR);
+bool isRotaryExpansionConnected = false;
+
 TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
 TaskHandle_t TaskScreen;
-TaskHandle_t TaskEncoder;
+TaskHandle_t TaskEncoderExpansion;
+TaskHandle_t TaskI2CScanner;
 
 // Stucture for key stroke
 Key key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
@@ -117,18 +105,10 @@ void setup() {
 
     printSpacer();
 
-    // Set encoder pins as inputs
-    pcf8574.encoder(encoderPinA, encoderPinB);
-    pcf8574.pinMode(encoderSW, INPUT_PULLUP);
+    Serial.println("Starting Wire...");
+    Wire.begin();
 
-    pcf8574.setLatency(0);
-    // Start library
-    pcf8574.begin();
-
-    rotaryEncoderDebounce = millis();
-
-    // Read the initial state of CLK
-    rotaryEncoderLastStateCLK = pcf8574.digitalRead(encoderPinA);
+    printSpacer();
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
@@ -136,6 +116,31 @@ void setup() {
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
+
+    printSpacer();
+
+    pcf8574RotaryExpansion.encoder(encoderPinA, encoderPinB);
+    pcf8574RotaryExpansion.pinMode(encoderSW, INPUT_PULLUP);
+    pcf8574RotaryExpansion.pinMode(expansionBtn1, INPUT_PULLUP);
+    pcf8574RotaryExpansion.pinMode(expansionBtn2, INPUT_PULLUP);
+    pcf8574RotaryExpansion.pinMode(expansionBtn3, INPUT_PULLUP);
+    pcf8574RotaryExpansion.setLatency(0);
+
+    if (pcf8574RotaryExpansion.begin()) {
+        Serial.println("Rotary Expansion Board initialized");
+        isRotaryExpansionConnected = true;
+    } else {
+        Serial.println("Rotary Expansion Board not found");
+        isRotaryExpansionConnected = false;
+    }
+
+    xTaskCreate(encoderTask,    /* Task function. */
+                "Encoder Task", /* name of task. */
+                5000,           /* Stack size of task */
+                NULL,           /* parameter of the task */
+                2,              /* priority of the task */
+                &TaskEncoderExpansion    /* Task handle to keep track of created task */
+    );
 
     printSpacer();
 
@@ -201,13 +206,14 @@ void setup() {
         &TaskScreen,   /* Task handle to keep track of created task */
         0);            /* pin task to core 0 */
 
-    xTaskCreate(encoderTask,    /* Task function. */
-                "Encoder Task", /* name of task. */
-                5000,           /* Stack size of task */
-                NULL,           /* parameter of the task */
-                1,              /* priority of the task */
-                &TaskEncoder    /* Task handle to keep track of created task */
-    );                          /* pin task to core 0 */
+    xTaskCreatePinnedToCore(
+        i2cScannerTask,  /* Task function. */
+        "Screen Task",   /* name of task. */
+        5000,            /* Stack size of task */
+        NULL,            /* parameter of the task */
+        1,               /* priority of the task */
+        &TaskI2CScanner, /* Task handle to keep track of created task */
+        0);              /* pin task to core 0 */
 
     printSpacer();
 
@@ -430,54 +436,97 @@ void screenTask(void *pvParameters) {
  *
  */
 void encoderTask(void *pvParameters) {
+    int value = 0;
+    bool btnState = false;
+    bool pinAState = false;
+    bool pinBState = false;
+    bool lastPinAState = false;
+    bool lastPinBState = false;
+    bool trigger = false;
+    unsigned long rotaryEncoderLastButtonPress = 0;
+    String direction = "";
+    byte btnArray[] = {encoderSW, expansionBtn1, expansionBtn2, expansionBtn3};
+
     while (true) {
-        // Read the current state of CLK
-        rotaryEncoderCurrentStateCLK = pcf8574.digitalRead(encoderPinA);
-
-        // If last and current state of CLK are different, then pulse
-        // occurred React to only 1 state rotaryEncoderChange to avoid double
-        // count
-        if (rotaryEncoderCurrentStateCLK != rotaryEncoderLastStateCLK &&
-            rotaryEncoderCurrentStateCLK == HIGH) {
-            // If the DT state is different than the CLK state then
-            // the encoder is rotating CCW so decrement
-            if (pcf8574.digitalRead(encoderPinB) != rotaryEncoderCurrentStateCLK) {
-                if (!(rotaryEncoderCurrentDir == "CCW" &&
-                      millis() - rotaryEncoderDebounce < 50)) {
-                    // Encoder is rotating CW so increment
-                    rotaryEncoderCounter++;
-                    rotaryEncoderCurrentDir = "CW";
-                    rotaryEncoderDebounce = millis();
-                    bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
+        if (isRotaryExpansionConnected) {
+            // Scan for rotary encoder
+            pinAState = pcf8574RotaryExpansion.digitalRead(encoderPinA);
+            pinBState = pcf8574RotaryExpansion.digitalRead(encoderPinB);
+            if (pinAState != lastPinAState || pinBState != lastPinBState) {
+                if (pinAState == true && pinBState == true) {
+                    if (lastPinAState == false && lastPinBState == true) {
+                        direction = "CCW";
+                    } else if (lastPinAState == true &&
+                               lastPinBState == false) {
+                        direction = "CW";
+                    }
+                    trigger = true;
+                } else if (pinAState == false && pinBState == false) {
+                    if (lastPinAState == false && lastPinBState == true) {
+                        direction = "CW";
+                    } else if (lastPinAState == true &&
+                               lastPinBState == false) {
+                        direction = "CCW";
+                    }
+                    trigger = true;
                 }
-            } else {
-                if (!(rotaryEncoderCurrentDir == "CW" &&
-                      millis() - rotaryEncoderDebounce < 50)) {
-                    rotaryEncoderCounter--;
-                    rotaryEncoderCurrentDir = "CCW";
-                    rotaryEncoderDebounce = millis();
-                    bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
+                lastPinAState = pinAState;
+                lastPinBState = pinBState;
+                if (trigger) {
+                    if (direction.equals("CW")) {
+                        bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
+                    } else if (direction.equals("CCW")) {
+                        bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
+                    }
+                    trigger = false;
                 }
             }
-            Serial.print("Direction: ");
-            Serial.print(rotaryEncoderCurrentDir);
-            Serial.print(" | Counter: ");
-            Serial.println(rotaryEncoderCounter);
-        }
 
-        // Remember last CLK state
-        rotaryEncoderLastStateCLK = rotaryEncoderCurrentStateCLK;
-
-        int btnState = pcf8574.digitalRead(encoderSW);
-
-        if (btnState == LOW) {
-            if (millis() - rotaryEncoderLastButtonPress > 50) {
-                Serial.println("Button pressed!");
-                bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+            // Scan for button press
+            for (int i = 0; i < 4; i++) {
+                btnState = pcf8574RotaryExpansion.digitalRead(btnArray[i]);
+                if (btnState == LOW &&
+                    millis() - rotaryEncoderLastButtonPress > 200) {
+                    switch (btnArray[i]) {
+                        case encoderSW:
+                            bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+                            break;
+                        case expansionBtn1:
+                            bleKeyboard.write(KEY_MEDIA_NEXT_TRACK);
+                            break;
+                        case expansionBtn2:
+                            bleKeyboard.write(KEY_MEDIA_PREVIOUS_TRACK);
+                            break;
+                        case expansionBtn3:
+                            bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+                            break;
+                    }
+                    rotaryEncoderLastButtonPress = millis();
+                }
             }
-            rotaryEncoderLastButtonPress = millis();
         }
-        vTaskDelay(2 / portTICK_PERIOD_MS);
+
+        vTaskDelay(3 / portTICK_PERIOD_MS);
+    }
+}
+
+void i2cScannerTask(void *pvParameters) {
+    while (true) {
+        byte error;
+        byte devices[1] = {ENCODER_EXPANSION_ADDR};
+        for (int i : devices) {
+            Wire.beginTransmission(devices[i]);
+            error = Wire.endTransmission();
+
+            if (devices[i] == ENCODER_EXPANSION_ADDR) {
+                if (error == 0)
+                    isRotaryExpansionConnected = true;
+                else
+                    isRotaryExpansionConnected = false;
+            }
+        }
+
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
