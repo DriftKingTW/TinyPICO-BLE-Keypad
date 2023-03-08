@@ -8,14 +8,14 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 TinyPICO tp = TinyPICO();
 
-PCF8574 pcf8574RotaryExpansion(ENCODER_EXPANSION_ADDR);
-bool isRotaryExpansionConnected = false;
+PCF8574 pcf8574RotaryExtension(ENCODER_EXTENSION_ADDR);
+bool isRotaryExtensionConnected = false;
 
 TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
 TaskHandle_t TaskScreen;
-TaskHandle_t TaskEncoderExpansion;
+TaskHandle_t TaskEncoderExtension;
 TaskHandle_t TaskI2CScanner;
 
 // Stucture for key stroke
@@ -85,6 +85,8 @@ bool clearDisplay = false;
 bool isSwitchingBootMode = false;
 bool isCaffeinated = false;
 bool isOutputLocked = false;
+bool isScreenInverted = false;
+bool isScreenDisabled = false;
 
 // OLED Screen Content
 String contentTop = "";
@@ -119,27 +121,28 @@ void setup() {
 
     printSpacer();
 
-    pcf8574RotaryExpansion.encoder(encoderPinA, encoderPinB);
-    pcf8574RotaryExpansion.pinMode(encoderSW, INPUT_PULLUP);
-    pcf8574RotaryExpansion.pinMode(expansionBtn1, INPUT_PULLUP);
-    pcf8574RotaryExpansion.pinMode(expansionBtn2, INPUT_PULLUP);
-    pcf8574RotaryExpansion.pinMode(expansionBtn3, INPUT_PULLUP);
-    pcf8574RotaryExpansion.setLatency(0);
+    pcf8574RotaryExtension.encoder(encoderPinA, encoderPinB);
+    pcf8574RotaryExtension.pinMode(encoderSW, INPUT_PULLUP);
+    pcf8574RotaryExtension.pinMode(extensionBtn1, INPUT_PULLUP);
+    pcf8574RotaryExtension.pinMode(extensionBtn2, INPUT_PULLUP);
+    pcf8574RotaryExtension.pinMode(extensionBtn3, INPUT_PULLUP);
+    pcf8574RotaryExtension.setLatency(0);
 
-    if (pcf8574RotaryExpansion.begin()) {
-        Serial.println("Rotary Expansion Board initialized");
-        isRotaryExpansionConnected = true;
+    if (pcf8574RotaryExtension.begin()) {
+        Serial.println("Rotary Extension Board initialized");
+        isRotaryExtensionConnected = true;
     } else {
-        Serial.println("Rotary Expansion Board not found");
-        isRotaryExpansionConnected = false;
+        Serial.println("Rotary Extension Board not found");
+        isRotaryExtensionConnected = false;
     }
 
-    xTaskCreate(encoderTask,    /* Task function. */
-                "Encoder Task", /* name of task. */
-                5000,           /* Stack size of task */
-                NULL,           /* parameter of the task */
-                2,              /* priority of the task */
-                &TaskEncoderExpansion    /* Task handle to keep track of created task */
+    xTaskCreate(
+        encoderTask,          /* Task function. */
+        "Encoder Task",       /* name of task. */
+        5000,                 /* Stack size of task */
+        NULL,                 /* parameter of the task */
+        2,                    /* priority of the task */
+        &TaskEncoderExtension /* Task handle to keep track of created task */
     );
 
     printSpacer();
@@ -445,13 +448,13 @@ void encoderTask(void *pvParameters) {
     bool trigger = false;
     unsigned long rotaryEncoderLastButtonPress = 0;
     String direction = "";
-    byte btnArray[] = {encoderSW, expansionBtn1, expansionBtn2, expansionBtn3};
+    byte btnArray[] = {encoderSW, extensionBtn1, extensionBtn2, extensionBtn3};
 
     while (true) {
-        if (isRotaryExpansionConnected) {
+        if (isRotaryExtensionConnected) {
             // Scan for rotary encoder
-            pinAState = pcf8574RotaryExpansion.digitalRead(encoderPinA);
-            pinBState = pcf8574RotaryExpansion.digitalRead(encoderPinB);
+            pinAState = pcf8574RotaryExtension.digitalRead(encoderPinA);
+            pinBState = pcf8574RotaryExtension.digitalRead(encoderPinB);
             if (pinAState != lastPinAState || pinBState != lastPinBState) {
                 if (pinAState == true && pinBState == true) {
                     if (lastPinAState == false && lastPinBState == true) {
@@ -484,20 +487,20 @@ void encoderTask(void *pvParameters) {
 
             // Scan for button press
             for (int i = 0; i < 4; i++) {
-                btnState = pcf8574RotaryExpansion.digitalRead(btnArray[i]);
+                btnState = pcf8574RotaryExtension.digitalRead(btnArray[i]);
                 if (btnState == LOW &&
                     millis() - rotaryEncoderLastButtonPress > 200) {
                     switch (btnArray[i]) {
                         case encoderSW:
                             bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
                             break;
-                        case expansionBtn1:
+                        case extensionBtn1:
                             bleKeyboard.write(KEY_MEDIA_NEXT_TRACK);
                             break;
-                        case expansionBtn2:
+                        case extensionBtn2:
                             bleKeyboard.write(KEY_MEDIA_PREVIOUS_TRACK);
                             break;
-                        case expansionBtn3:
+                        case extensionBtn3:
                             bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
                             break;
                     }
@@ -513,16 +516,16 @@ void encoderTask(void *pvParameters) {
 void i2cScannerTask(void *pvParameters) {
     while (true) {
         byte error;
-        byte devices[1] = {ENCODER_EXPANSION_ADDR};
+        byte devices[1] = {ENCODER_EXTENSION_ADDR};
         for (int i : devices) {
             Wire.beginTransmission(devices[i]);
             error = Wire.endTransmission();
 
-            if (devices[i] == ENCODER_EXPANSION_ADDR) {
+            if (devices[i] == ENCODER_EXTENSION_ADDR) {
                 if (error == 0)
-                    isRotaryExpansionConnected = true;
+                    isRotaryExtensionConnected = true;
                 else
-                    isRotaryExpansionConnected = false;
+                    isRotaryExtensionConnected = false;
             }
         }
 
@@ -558,6 +561,12 @@ void loop() {
                         delay(300);
                     } else if (r == 3 && c == 4) {
                         isOutputLocked = !isOutputLocked;
+                        delay(300);
+                    } else if (r == 1 && c == 6) {
+                        isScreenDisabled = !isScreenDisabled;
+                        delay(300);
+                    } else if (r == 3 && c == 6) {
+                        isScreenInverted = !isScreenInverted;
                         delay(300);
                     }
                 } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
@@ -914,10 +923,15 @@ void renderScreen() {
             u8g2.drawGlyph(0, 16, 0x00);
     }
 
-    while (clearDisplay) {
+    while (clearDisplay || isScreenDisabled) {
         u8g2.clearBuffer();
         u8g2.sendBuffer();
         delay(100);
+    }
+
+    if (isScreenInverted) {
+        u8g2.drawBox(0, 0, 192, 64);
+        u8g2.setDrawColor(2);
     }
 
     u8g2.sendBuffer();
@@ -1013,7 +1027,13 @@ void checkBattery() {
 void showLowBatteryWarning() {
     if (!isLowBattery) {
         if (bleKeyboard.isConnected()) {
-            tp.DotStar_SetPower(false);
+            if (isScreenDisabled) {
+                tp.DotStar_SetPower(true);
+                tp.DotStar_SetBrightness(1);
+                tp.DotStar_SetPixelColor(0, 0, 255);
+            } else {
+                tp.DotStar_SetPower(false);
+            }
         }
         return;
     }

@@ -37,18 +37,18 @@ using namespace std;
 #define ROWS 5
 #define COLS 7
 
-// ====== Expansion Board Pin Definition ======
+// ====== Extension Board Pin Definition ======
 
-// Rotary Encoder Expansion Board
+// Rotary Encoder Extension Board
 #define encoderPinA P5
 #define encoderPinB P4
 #define encoderSW P6
-#define expansionBtn1 P0
-#define expansionBtn2 P1
-#define expansionBtn3 P2
-#define ENCODER_EXPANSION_ADDR 0x38
+#define extensionBtn1 P0
+#define extensionBtn2 P1
+#define extensionBtn3 P2
+#define ENCODER_EXTENSION_ADDR 0x38
 
-// ====== End Expansion Board Pin Definition ======
+// ====== End Extension Board Pin Definition ======
 
 struct Key {
     uint8_t keyStroke;
