@@ -56,6 +56,16 @@ struct Key {
     String keyInfo;
 };
 
+struct RotaryEncoder {
+    uint8_t rotaryButton;
+    String rotaryButtonInfo;
+    bool rotaryButtonState;
+    uint8_t rotaryCW;
+    uint8_t rotaryCCW;
+    String rotaryCWInfo;
+    String rotaryCCWInfo;
+};
+
 struct Macro {
     unsigned short type;
     // 6 key roll over using BLE keyboard
@@ -77,7 +87,9 @@ void initKeys();
 void initMacros();
 void updateKeymaps();
 void keyPress(Key &key);
+bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState);
 void keyRelease(Key &key);
+bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState);
 void macroPress(Macro &macro);
 void switchLayout();
 void switchLayout(int layoutIndex);

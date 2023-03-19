@@ -1,36 +1,144 @@
-[
-  {
-    "title": "Default",
-    "keymap": [
-      [177, 0, 0, 0, 0, 0, 0],
-      [179, 113, 119, 101, 114, 116, 8],
-      [128, 97, 115, 100, 102, 103, 0],
-      [129, 122, 120, 99, 118, 98, 176],
-      [0, 130, 135, 0, 32, 131, 0]
-    ],
-    "keyInfo": [
-      ["ESC", "MACRO_0", "MACRO_1", "MACRO_2", "MACRO_3", "MACRO_4", "NULL"],
-      ["TAB", "Q", "W", "E", "R", "T", "DELETE"],
-      ["CTRL", "A", "S", "D", "F", "G", "NULL"],
-      ["SHIFT", "Z", "X", "C", "V", "B", "RETURN"],
-      ["FN", "OPTION", "COMMAND", "NULL", "SPACE", "H", "NULL"]
-    ]
-  },
-  {
-    "title": "Procreate",
-    "keymap": [
-      [177, 49, 50, 51, 52, 53, 0],
-      [179, 115, 119, 101, 91, 93, 8],
-      [128, 91, 93, 108, 98, 103, 0],
-      [129, 122, 120, 99, 118, 98, 176],
-      [0, 130, 131, 0, 32, 131, 0]
-    ],
-    "keyInfo": [
-      ["ESC", "1", "2", "3", "4", "5", "NULL"],
-      ["TAB", "Select", "W", "Eraser", "BrushDown", "BrushUp", "DELETE"],
-      ["CTRL", "BrushDown", "BrushUp", "Layers", "Brush", "G", "NULL"],
-      ["SHIFT", "Z", "X", "C(Colors)", "V(Transform)", "B", "RETURN"],
-      ["FN", "OPTION", "COMMAND", "NULL", "SPACE", "COMMAND", "NULL"]
-    ]
-  }
-]
+{
+  "keyConfig": [
+    {
+      "title": "Default",
+      "keymap": [
+        [177, 49, 50, 51, 52, 53, 0],
+        [179, 113, 119, 101, 114, 116, 8],
+        [128, 97, 115, 100, 102, 103, 0],
+        [129, 122, 120, 99, 118, 98, 176],
+        [0, 130, 131, 0, 32, 131, 0]
+      ],
+      "keyInfo": [
+        ["Escape", "1", "2", "3", "4", "5", "NULL"],
+        ["Tab", "Q", "W", "E", "R", "T", "Delete"],
+        ["Ctrl", "A", "S", "D", "F", "G", "NULL"],
+        ["Shift", "Z", "X", "C", "V", "B", "Enter"],
+        ["FN", "Option", "Command", "NULL", "Space", "H", "NULL"]
+      ]
+    },
+    {
+      "title": "Procreate",
+      "keymap": [
+        [177, 49, 50, 51, 52, 53, 0],
+        [179, 115, 119, 101, 114, 116, 8],
+        [128, 91, 93, 108, 98, 103, 0],
+        [129, 122, 120, 99, 118, 98, 176],
+        [0, 130, 131, 0, 32, 131, 131]
+      ],
+      "keyInfo": [
+        ["Escape", "1", "2", "3", "4", "5", "NULL"],
+        ["MACRO_1", "Select", "W", "Eraser", "MACRO_2", "MACRO_3", "Delete"],
+        [
+          "Control",
+          "BrushDown",
+          "BrushUp",
+          "Layers",
+          "Brush",
+          "MACRO_4",
+          "NULL"
+        ],
+        ["Shift", "Z", "X", "C(Colors)", "V(Transform)", "B", "Enter"],
+        ["FN", "Option", "Command", "NULL", "Space", "COMMAND", "Command"]
+      ]
+    },
+    {
+      "title": "Numpad",
+      "keymap": [
+        [0, 0, 0, 47, 42, 45, 0],
+        [0, 0, 0, 55, 56, 57, 43],
+        [0, 0, 0, 52, 53, 54, 0],
+        [0, 0, 0, 49, 50, 51, 69],
+        [0, 0, 68, 0, 48, 0, 46]
+      ],
+      "keyInfo": [
+        [" ", " ", " ", "/", "*", "-", " "],
+        [" ", " ", " ", "7", "8", "9", "+"],
+        [" ", " ", " ", "4", "5", "6", " "],
+        [" ", " ", " ", "1", "2", "3", "Enter"],
+        ["FN", " ", "Delete", " ", "0", " ", "."]
+      ]
+    },
+    {
+      "title": "Clip Studio Paint",
+      "keymap": [
+        [177, 49, 50, 51, 52, 53, 0],
+        [179, 113, 119, 101, 114, 116, 178],
+        [128, 97, 115, 100, 102, 103, 0],
+        [129, 122, 120, 99, 118, 98, 224],
+        [0, 130, 131, 0, 32, 0, 131]
+      ],
+      "keyInfo": [
+        ["Escape", "MACRO_5", "MACRO_6", "3", "4", "5", " "],
+        ["Tab", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "Backspace"],
+        ["ControlLeft", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", " "],
+        ["Shift", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "NumpadEnter"],
+        ["FN", "Option", "Command", " ", "Space", " ", "Command"]
+      ]
+    }
+  ],
+  "macros": [
+    {
+      "type": 0,
+      "name": "Task Manager",
+      "keyStrokes": [128, 130, 212],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Toggle Fullscreen",
+      "keyStrokes": [131, 48],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Actions Menu",
+      "keyStrokes": [131, 107],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Perspective Guide",
+      "keyStrokes": [131, 59],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Copy All Layers",
+      "keyStrokes": [131, 97],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "3D Preview",
+      "keyStrokes": [131, 129, 130, 128, 51],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Set ICC Preview",
+      "keyStrokes": [131, 130, 129, 128, 52],
+      "stringContent": ""
+    }
+  ],
+  "rotaryExtension": [
+    {
+      "keymap": [97, 98, 99],
+      "keyInfo": ["c", "c", "c"],
+      "rotaryMap": [50, 49, 51],
+      "rotaryInfo": ["Digit2", "Digit1", "Digit3"]
+    },
+    {
+      "keymap": [97, 98, 99],
+      "keyInfo": ["KeyA", "KeyB", "KeyC"],
+      "rotaryMap": [104, 91, 93],
+      "rotaryInfo": ["KeyH", "BracketLeft", "BracketRight"]
+    },
+    {
+      "keymap": [99, 100, 99],
+      "keyInfo": ["KeyC", "KeyD", "KeyC"],
+      "rotaryMap": [104, 103, 106],
+      "rotaryInfo": ["KeyH", "KeyG", "KeyJ"]
+    }
+  ]
+}

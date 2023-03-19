@@ -37,6 +37,12 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key14, key15, key16, key17, key18, key19, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, dummy, key31}};
+// Rotray Extnesion
+Key rotaryExtKey1, rotaryExtKey2, rotaryExtKey3;
+RotaryEncoder rotaryExtEncoder1;
+
+Key rotaryExtKeyMap[3] = {rotaryExtKey1, rotaryExtKey2, rotaryExtKey3};
+RotaryEncoder rotaryExtRotaryEncoderMap[1] = {rotaryExtEncoder1};
 
 String keyMapJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
@@ -476,10 +482,19 @@ void encoderTask(void *pvParameters) {
                 lastPinAState = pinAState;
                 lastPinBState = pinBState;
                 if (trigger) {
+                    resetIdle();
                     if (direction.equals("CW")) {
-                        bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
+                        bleKeyboard.write(
+                            rotaryExtRotaryEncoderMap[0].rotaryCW);
+                        updateKeyInfo = true;
+                        currentKeyInfo =
+                            rotaryExtRotaryEncoderMap[0].rotaryCWInfo;
                     } else if (direction.equals("CCW")) {
-                        bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
+                        bleKeyboard.write(
+                            rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                        updateKeyInfo = true;
+                        currentKeyInfo =
+                            rotaryExtRotaryEncoderMap[0].rotaryCCWInfo;
                     }
                     trigger = false;
                 }
@@ -488,23 +503,85 @@ void encoderTask(void *pvParameters) {
             // Scan for button press
             for (int i = 0; i < 4; i++) {
                 btnState = pcf8574RotaryExtension.digitalRead(btnArray[i]);
-                if (btnState == LOW &&
-                    millis() - rotaryEncoderLastButtonPress > 200) {
+                if (btnState == LOW) {
+                    resetIdle();
                     switch (btnArray[i]) {
                         case encoderSW:
-                            bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+                            // when using keyboard.write
+                            // if (millis() - rotaryEncoderLastButtonPress >
+                            // 200) {
+                            //     bleKeyboard.write(
+                            //         rotaryExtRotaryEncoderMap[0].rotaryButton);
+                            //     updateKeyInfo = true;
+                            //     currentKeyInfo = rotaryExtRotaryEncoderMap[0]
+                            //                          .rotaryButtonInfo;
+                            // }
+                            rotaryExtRotaryEncoderMap[0]
+                                .rotaryButtonState = keyPress(
+                                rotaryExtRotaryEncoderMap[0].rotaryButton,
+                                rotaryExtRotaryEncoderMap[0].rotaryButtonInfo,
+                                rotaryExtRotaryEncoderMap[0].rotaryButtonState);
+                            break;
                             break;
                         case extensionBtn1:
-                            bleKeyboard.write(KEY_MEDIA_NEXT_TRACK);
+                            rotaryExtKeyMap[0].state =
+                                keyPress(rotaryExtKeyMap[0].keyStroke,
+                                         rotaryExtKeyMap[0].keyInfo,
+                                         rotaryExtKeyMap[0].state);
                             break;
                         case extensionBtn2:
-                            bleKeyboard.write(KEY_MEDIA_PREVIOUS_TRACK);
+                            rotaryExtKeyMap[1].state =
+                                keyPress(rotaryExtKeyMap[1].keyStroke,
+                                         rotaryExtKeyMap[1].keyInfo,
+                                         rotaryExtKeyMap[1].state);
                             break;
                         case extensionBtn3:
-                            bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+                            rotaryExtKeyMap[2].state =
+                                keyPress(rotaryExtKeyMap[2].keyStroke,
+                                         rotaryExtKeyMap[2].keyInfo,
+                                         rotaryExtKeyMap[2].state);
                             break;
                     }
                     rotaryEncoderLastButtonPress = millis();
+                } else if (btnState == HIGH) {
+                    switch (btnArray[i]) {
+                        case encoderSW:
+                            if (rotaryExtRotaryEncoderMap[0]
+                                    .rotaryButtonState) {
+                                rotaryExtRotaryEncoderMap[0]
+                                    .rotaryButtonState = keyRelease(
+                                    rotaryExtRotaryEncoderMap[0].rotaryButton,
+                                    rotaryExtRotaryEncoderMap[0]
+                                        .rotaryButtonInfo,
+                                    rotaryExtRotaryEncoderMap[0]
+                                        .rotaryButtonState);
+                            }
+                            break;
+                        case extensionBtn1:
+                            if (rotaryExtKeyMap[0].state) {
+                                rotaryExtKeyMap[0].state =
+                                    keyRelease(rotaryExtKeyMap[0].keyStroke,
+                                               rotaryExtKeyMap[0].keyInfo,
+                                               rotaryExtKeyMap[0].state);
+                            }
+                            break;
+                        case extensionBtn2:
+                            if (rotaryExtKeyMap[1].state) {
+                                rotaryExtKeyMap[1].state =
+                                    keyRelease(rotaryExtKeyMap[1].keyStroke,
+                                               rotaryExtKeyMap[1].keyInfo,
+                                               rotaryExtKeyMap[1].state);
+                            }
+                            break;
+                        case extensionBtn3:
+                            if (rotaryExtKeyMap[2].state) {
+                                rotaryExtKeyMap[2].state =
+                                    keyRelease(rotaryExtKeyMap[2].keyStroke,
+                                               rotaryExtKeyMap[2].keyInfo,
+                                               rotaryExtKeyMap[2].state);
+                            }
+                            break;
+                    }
                 }
             }
         }
@@ -610,10 +687,10 @@ void initKeys() {
     uint8_t keyLayout[ROWS][COLS];
     String keyInfo[ROWS][COLS];
 
-    copyArray(doc[currentLayoutIndex]["keymap"], keyLayout);
-    copyArray(doc[currentLayoutIndex]["keyInfo"], keyInfo);
+    copyArray(doc["keyConfig"][currentLayoutIndex]["keymap"], keyLayout);
+    copyArray(doc["keyConfig"][currentLayoutIndex]["keyInfo"], keyInfo);
 
-    layoutLength = doc.size();
+    layoutLength = doc["keyConfig"].size();
 
     // GPIO configuration
     for (int i = 0; i < outputCount; i++) {
@@ -634,8 +711,41 @@ void initKeys() {
         }
     }
 
+    // Load Rotary Extension config from doc["rotaryExtension"]
+    uint8_t rotaryExtKeyLayout[3];
+    String rotaryExtKeyInfo[3];
+    uint8_t rotaryExtRotaryMap[3];
+    String rotaryExtRotaryInfo[3];
+    if (doc["rotaryExtension"].isNull()) {
+        Serial.println("No rotary extension config found");
+    } else {
+        copyArray(doc["rotaryExtension"][currentLayoutIndex]["keymap"],
+                  rotaryExtKeyLayout);
+        copyArray(doc["rotaryExtension"][currentLayoutIndex]["keyInfo"],
+                  rotaryExtKeyInfo);
+        copyArray(doc["rotaryExtension"][currentLayoutIndex]["rotaryMap"],
+                  rotaryExtRotaryMap);
+        copyArray(doc["rotaryExtension"][currentLayoutIndex]["rotaryInfo"],
+                  rotaryExtRotaryInfo);
+
+        // Assign keymap data
+        for (int i = 0; i < 3; i++) {
+            rotaryExtKeyMap[i].keyStroke = rotaryExtKeyLayout[i];
+            rotaryExtKeyMap[i].keyInfo = rotaryExtKeyInfo[i];
+            rotaryExtKeyMap[i].state = false;
+            rotaryExtRotaryEncoderMap[0].rotaryButton = rotaryExtRotaryMap[0];
+            rotaryExtRotaryEncoderMap[0].rotaryButtonInfo =
+                rotaryExtRotaryInfo[0];
+            rotaryExtRotaryEncoderMap[0].rotaryButtonState = false;
+            rotaryExtRotaryEncoderMap[0].rotaryCCW = rotaryExtRotaryMap[1];
+            rotaryExtRotaryEncoderMap[0].rotaryCW = rotaryExtRotaryMap[2];
+            rotaryExtRotaryEncoderMap[0].rotaryCCWInfo = rotaryExtRotaryInfo[1];
+            rotaryExtRotaryEncoderMap[0].rotaryCWInfo = rotaryExtRotaryInfo[2];
+        }
+    }
+
     // Show layout title on screen
-    String str = doc[currentLayoutIndex]["title"];
+    String str = doc["keyConfig"][currentLayoutIndex]["title"];
     currentLayout = str;
     contentBottom = "Layout: " + currentLayout;
 
@@ -708,6 +818,19 @@ void keyPress(Key &key) {
     currentKeyInfo = key.keyInfo;
 }
 
+bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState) {
+    if (keyInfo == "FN") {
+        isFnKeyPressed = true;
+    }
+    if (keyState == false && !isOutputLocked) {
+        bleKeyboard.press(keyStroke);
+    }
+    keyState = true;
+    updateKeyInfo = true;
+    currentKeyInfo = keyInfo;
+    return keyState;
+}
+
 /**
  * Release key
  *
@@ -722,6 +845,17 @@ void keyRelease(Key &key) {
     }
     key.state = false;
     return;
+}
+
+bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState) {
+    if (keyInfo == "FN") {
+        isFnKeyPressed = false;
+    }
+    if (keyState == true && !isOutputLocked) {
+        bleKeyboard.release(keyStroke);
+    }
+    keyState = false;
+    return keyState;
 }
 
 /**
