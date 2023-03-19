@@ -292,7 +292,7 @@ void generalTask(void *pvParameters) {
                     currentActiveDeviceAddress = String(addresses[i].c_str());
                     StaticJsonDocument<128> doc;
                     if (SPIFFS.begin()) {
-                        File config = SPIFFS.open("/config.json", "w");
+                        File config = SPIFFS.open("/system.json", "w");
                         doc["currentActiveDeviceAddress"] =
                             currentActiveDeviceAddress;
                         serializeJson(doc, config);
@@ -939,7 +939,7 @@ void switchDevice() {
     Serial.println("Address: " + (String)currentActiveDeviceAddress);
     if (SPIFFS.begin()) {
         StaticJsonDocument<128> doc;
-        File config = SPIFFS.open("/config.json", "w");
+        File config = SPIFFS.open("/system.json", "w");
         doc["currentActiveDeviceAddress"] = currentActiveDeviceAddress;
         serializeJson(doc, config);
         config.close();
@@ -1199,14 +1199,14 @@ void resetIdle() { sleepPreviousMillis = currentMillis; }
  *
  */
 void initWebServer() {
-    Serial.println("Loading \"wifi.json\" from SPIFFS...");
-    File file = SPIFFS.open("/wifi.json");
+    Serial.println("Loading \"config.json\" from SPIFFS...");
+    File file = SPIFFS.open("/config.json");
     if (!file) {
         Serial.println("Failed to open file for reading");
         return;
     }
 
-    Serial.println("Reading WIFI configuration from \"wifi.json\"...");
+    Serial.println("Reading WIFI configuration from \"config.json\"...");
     String wifiConfigJSON = "";
     while (file.available()) {
         wifiConfigJSON += (char)file.read();
@@ -1427,14 +1427,14 @@ void initWebServer() {
         String buffer;
         DynamicJsonDocument doc(512);
 
-        Serial.println("Loading \"wifi.json\" from SPIFFS...");
-        File file = SPIFFS.open("/wifi.json");
+        Serial.println("Loading \"config.json\" from SPIFFS...");
+        File file = SPIFFS.open("/config.json");
         if (!file) {
             Serial.println("Failed to open file for reading");
             return;
         }
 
-        Serial.println("Reading WIFI configuration from \"wifi.json\"...");
+        Serial.println("Reading WIFI configuration from \"config.json\"...");
         String wifiConfigJSON = "";
         while (file.available()) {
             wifiConfigJSON += (char)file.read();
@@ -1475,7 +1475,7 @@ void initWebServer() {
             return;
         }
 
-        const String filename = "wifi.json";
+        const String filename = "config.json";
 
         File config = SPIFFS.open("/" + filename, "w");
         if (!config) {
