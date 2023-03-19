@@ -64,7 +64,8 @@ const int outputCount = sizeof(outputs) / sizeof(outputs[0]);
 
 // Auto sleep timer
 unsigned long sleepPreviousMillis = 0;
-const long SLEEP_INTERVAL = 10 * 60 * 1000;
+const long SLEEP_INTERVAL = 30 * 60 * 1000;
+const long SCREEN_SLEEP_INTERVAL = 3 * 60 * 1000;
 
 // Battery timer
 unsigned long batteryPreviousMillis = 0;
@@ -93,6 +94,7 @@ bool isCaffeinated = false;
 bool isOutputLocked = false;
 bool isScreenInverted = false;
 bool isScreenDisabled = false;
+bool isScreenSleeping = false;
 
 // OLED Screen Content
 String contentTop = "";
@@ -1057,7 +1059,7 @@ void renderScreen() {
             u8g2.drawGlyph(0, 16, 0x00);
     }
 
-    while (clearDisplay || isScreenDisabled) {
+    while (clearDisplay || isScreenDisabled || isScreenSleeping) {
         u8g2.clearBuffer();
         u8g2.sendBuffer();
         delay(100);
@@ -1132,6 +1134,9 @@ void checkIdle() {
     if (!isCaffeinated &&
         currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
         goSleeping();
+    } else if (!isCaffeinated &&
+               currentMillis - sleepPreviousMillis > SCREEN_SLEEP_INTERVAL) {
+        isScreenSleeping = true;
     }
 }
 
@@ -1161,7 +1166,7 @@ void checkBattery() {
 void showLowBatteryWarning() {
     if (!isLowBattery) {
         if (bleKeyboard.isConnected()) {
-            if (isScreenDisabled) {
+            if (isScreenDisabled || isScreenSleeping) {
                 tp.DotStar_SetPower(true);
                 tp.DotStar_SetBrightness(1);
                 tp.DotStar_SetPixelColor(0, 0, 255);
@@ -1192,7 +1197,10 @@ void showLowBatteryWarning() {
  * Update sleepPreviousMillis' value to reset idle timer
  *
  */
-void resetIdle() { sleepPreviousMillis = currentMillis; }
+void resetIdle() {
+    sleepPreviousMillis = currentMillis;
+    isScreenSleeping = false;
+}
 
 /**
  * Activate WiFi and start the server
