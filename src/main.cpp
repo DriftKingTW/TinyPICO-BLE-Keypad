@@ -44,7 +44,7 @@ RotaryEncoder rotaryExtEncoder1;
 Key rotaryExtKeyMap[3] = {rotaryExtKey1, rotaryExtKey2, rotaryExtKey3};
 RotaryEncoder rotaryExtRotaryEncoderMap[1] = {rotaryExtEncoder1};
 
-String keyMapJSON = "", macroMapJSON = "";
+String keyConfigJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
 bool updateKeyInfo = false;
 bool isFnKeyPressed = false;
@@ -172,8 +172,7 @@ void setup() {
     Serial.println(listFiles());
 
     Serial.println("Loading config files from SPIFFS...");
-    keyMapJSON = loadJSONFileAsString("keyconfig");
-    macroMapJSON = loadJSONFileAsString("macros");
+    keyConfigJSON = loadJSONFileAsString("keyconfig");
 
     StaticJsonDocument<256> doc;
     String configJSON = loadJSONFileAsString("config");
@@ -680,7 +679,7 @@ void initKeys() {
 
     DynamicJsonDocument doc(jsonDocSize);
     DeserializationError err = deserializeJson(
-        doc, keyMapJSON, DeserializationOption::NestingLimit(5));
+        doc, keyConfigJSON, DeserializationOption::NestingLimit(5));
     if (err) {
         Serial.print(F("deserializeJson() failed: "));
         Serial.println(err.c_str());
@@ -763,20 +762,20 @@ void initKeys() {
 void initMacros() {
     DynamicJsonDocument doc(jsonDocSize);
     DeserializationError err = deserializeJson(
-        doc, macroMapJSON, DeserializationOption::NestingLimit(5));
+        doc, keyConfigJSON, DeserializationOption::NestingLimit(5));
     if (err) {
         Serial.print(F("deserializeJson() failed: "));
         Serial.println(err.c_str());
     }
-    size_t macrosLength = doc.size();
+    size_t macrosLength = doc["macros"].size();
     for (size_t i = 0; i < macrosLength; i++) {
         uint8_t macroLayout[] = {0, 0, 0, 0, 0, 0};
-        String macroNameStr = doc[i]["name"];
-        String macroStringContent = doc[i]["stringContent"];
-        macroMap[i].type = doc[i]["type"];
+        String macroNameStr = doc["macros"][i]["name"];
+        String macroStringContent = doc["macros"][i]["stringContent"];
+        macroMap[i].type = doc["macros"][i]["type"];
         macroMap[i].macroInfo = macroNameStr;
         macroMap[i].stringContent = macroStringContent;
-        copyArray(doc[i]["keyStrokes"], macroLayout);
+        copyArray(doc["macros"][i]["keyStrokes"], macroLayout);
         std::copy(std::begin(macroLayout), std::end(macroLayout),
                   std::begin(macroMap[i].keyStrokes));
     }
@@ -789,12 +788,10 @@ void initMacros() {
 void updateKeymaps() {
     resetIdle();
 
-    keyMapJSON = "";
-    macroMapJSON = "";
+    keyConfigJSON = "";
 
     Serial.println("Loading config files from SPIFFS...");
-    keyMapJSON = loadJSONFileAsString("keyconfig");
-    macroMapJSON = loadJSONFileAsString("macros");
+    keyConfigJSON = loadJSONFileAsString("keyconfig");
 
     initKeys();
     initMacros();
@@ -908,7 +905,7 @@ void switchLayout(int layoutIndex) {
 int findLayoutIndex(String layoutName) {
     DynamicJsonDocument doc(jsonDocSize);
     DeserializationError err = deserializeJson(
-        doc, keyMapJSON, DeserializationOption::NestingLimit(5));
+        doc, keyConfigJSON, DeserializationOption::NestingLimit(5));
     if (err) {
         Serial.print(F("deserializeJson() failed: "));
         Serial.println(err.c_str());
@@ -1323,13 +1320,13 @@ void initWebServer() {
 
         Serial.println("Reading key configuration from \"" + filename +
                        ".json\"...");
-        String keyconfigJSON = "";
+        String keyConfigJSON = "";
         while (file.available()) {
-            keyconfigJSON += (char)file.read();
+            keyConfigJSON += (char)file.read();
         }
         file.close();
 
-        deserializeJson(doc, keyconfigJSON);
+        deserializeJson(doc, keyConfigJSON);
         res["message"] = "success";
         res["config"] = doc;
         serializeJson(res, buffer);
