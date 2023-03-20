@@ -91,6 +91,8 @@ bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState);
 void keyRelease(Key &key);
 bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState);
 void macroPress(Macro &macro);
+void tapToggleActive(size_t index);
+void tapToggleRelease(size_t orginalLayerIndex);
 void switchLayout();
 void switchLayout(int layoutIndex);
 int findLayoutIndex(String layoutName);

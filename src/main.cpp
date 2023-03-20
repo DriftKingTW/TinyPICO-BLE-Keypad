@@ -56,6 +56,8 @@ byte layoutLength = 0;
 String currentLayout = "";
 // For maximum 10 layers
 const short jsonDocSize = 16384;
+size_t tapToggleOrginalLayerIndex = 0;
+bool isTemporaryToggled = false;
 
 byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
 const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
@@ -655,11 +657,25 @@ void loop() {
                             .substring(6, sizeof(keyMap[r][c].keyInfo) - 1)
                             .toInt();
                     macroPress(macroMap[index]);
+                } else if (keyMap[r][c].keyInfo.startsWith("TT_")) {
+                    // Tap-Toggle press
+                    if (!isTemporaryToggled) {
+                        size_t index =
+                            keyMap[r][c]
+                                .keyInfo
+                                .substring(3, sizeof(keyMap[r][c].keyInfo) - 1)
+                                .toInt();
+                        tapToggleActive(index);
+                    }
                 } else {
                     // Standard key press
                     keyPress(keyMap[r][c]);
                 }
             } else {
+                if (keyMap[r][c].keyInfo.startsWith("TT_") &&
+                    isTemporaryToggled) {
+                    tapToggleRelease(tapToggleOrginalLayerIndex);
+                }
                 keyRelease(keyMap[r][c]);
             }
             delayMicroseconds(10);
@@ -882,6 +898,29 @@ void macroPress(Macro &macro) {
         bleKeyboard.println(macro.stringContent);
     }
     delay(100);
+}
+
+/**
+ * Tap toggle layer
+ *
+ * @param {size_t} index of the layer to be toggled
+ */
+void tapToggleActive(size_t index) {
+    isTemporaryToggled = true;
+    tapToggleOrginalLayerIndex = currentLayoutIndex;
+    currentLayoutIndex = index;
+    initKeys();
+}
+
+/**
+ * Tap toggle layer release
+ *
+ * @param {size_t} original layer index of the layer to be restored
+ */
+void tapToggleRelease(size_t orginalLayerIndex) {
+    isTemporaryToggled = false;
+    currentLayoutIndex = orginalLayerIndex;
+    initKeys();
 }
 
 /**
