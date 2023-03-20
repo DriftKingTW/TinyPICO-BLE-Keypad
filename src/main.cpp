@@ -372,7 +372,7 @@ void generalTask(void *pvParameters) {
         // Show connecting message when BLE is disconnected
         while (!bleKeyboard.isConnected()) {
             contentBottom = "Connecting BLE..";
-            breathLEDAnimation();
+            // breathLEDAnimation();
             checkIdle();
             delay(100);
         }
@@ -1202,7 +1202,7 @@ void checkBattery() {
 void showLowBatteryWarning() {
     if (!isLowBattery) {
         if (bleKeyboard.isConnected()) {
-            if (isScreenDisabled || isScreenSleeping) {
+            if ((isScreenDisabled || isScreenSleeping) && !isLowBattery) {
                 tp.DotStar_SetPower(true);
                 tp.DotStar_SetBrightness(1);
                 tp.DotStar_SetPixelColor(0, 0, 255);
