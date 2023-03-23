@@ -177,7 +177,7 @@ void setup() {
     keyConfigJSON = loadJSONFileAsString("keyconfig");
 
     StaticJsonDocument<256> doc;
-    String configJSON = loadJSONFileAsString("config");
+    String configJSON = loadJSONFileAsString("system");
     deserializeJson(doc, configJSON);
     String address = doc["currentActiveDeviceAddress"];
     currentActiveDeviceAddress = address;
