@@ -36,7 +36,7 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key7, key8, key9, key10, key11, key12, key13},
                           {key14, key15, key16, key17, key18, key19, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
-                          {key27, key28, key29, dummy, key30, dummy, key31}};
+                          {key27, key28, key29, dummy, key30, key31, dummy}};
 // Rotray Extnesion
 Key rotaryExtKey1, rotaryExtKey2, rotaryExtKey3;
 RotaryEncoder rotaryExtEncoder1;
