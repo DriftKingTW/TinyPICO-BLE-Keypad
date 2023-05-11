@@ -81,6 +81,10 @@ const long LED_INTERVAL = 5 * 1000;
 unsigned long networkInfoPreviousMillis = 0;
 const long NETWORK_INFO_INTERVAL = 5 * 1000;
 
+// Tap-Toggle timer
+unsigned long tapTogglePreviousMillis = 0;
+uint8_t tapToggleCount = 0;
+
 unsigned long currentMillis = 0;
 
 bool isLowBattery = false;
@@ -919,7 +923,17 @@ void tapToggleActive(size_t index) {
  */
 void tapToggleRelease(size_t orginalLayerIndex) {
     isTemporaryToggled = false;
-    currentLayoutIndex = orginalLayerIndex;
+    tapToggleCount++;
+    if (currentMillis - tapTogglePreviousMillis < 300) {
+        if (tapToggleCount > 1) {
+            tapToggleCount = 0;
+            currentLayoutIndex = orginalLayerIndex;
+        }
+    } else {
+        tapToggleCount = 0;
+        currentLayoutIndex = orginalLayerIndex;
+    }
+    tapTogglePreviousMillis = currentMillis;
     initKeys();
 }
 
