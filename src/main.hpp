@@ -3,6 +3,7 @@
 #include <BleKeyboard.h>
 #include <EEPROM.h>
 #include <ESPmDNS.h>
+#include <ImprovWiFiLibrary.h>
 #include <PCF8574.h>
 #include <SPIFFS.h>
 #include <TinyPICO.h>

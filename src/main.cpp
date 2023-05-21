@@ -111,6 +111,28 @@ int contentIcon = 0;
 
 // Set web server port number to 80
 WebServer server(80);
+ImprovWiFi improvSerial(&Serial);
+
+void onImprovWiFiErrorCb(ImprovTypes::Error err) {
+    Serial.println("Error: " + String(err));
+}
+
+void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
+    // Save ssid and password to config.json
+    DynamicJsonDocument doc(256);
+
+    doc["ssid"] = ssid;
+    doc["password"] = password;
+
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+        Serial.println("Failed to open config file for writing");
+    }
+    if (serializeJson(doc, configFile) == 0) {
+        Serial.println("Failed to write to config file");
+    }
+    configFile.close();
+}
 
 void setup() {
     Serial.begin(BAUD_RATE);
@@ -132,6 +154,15 @@ void setup() {
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
+
+    printSpacer();
+
+    Serial.println("Starting improv serial work...");
+    improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32,
+                               "Schnell Firmware", "0.3.0 beta",
+                               "Schnell Keyboard");
+    improvSerial.onImprovError(onImprovWiFiErrorCb);
+    improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
 
     printSpacer();
 
@@ -432,7 +463,8 @@ void ledTask(void *pvParameters) {
 void networkTask(void *pvParameters) {
     while (true) {
         server.handleClient();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        improvSerial.handleSerial();
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
