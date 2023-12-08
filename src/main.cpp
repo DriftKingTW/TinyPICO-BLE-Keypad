@@ -6,7 +6,7 @@ RTC_DATA_ATTR bool bootWiFiMode = false;
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
                                             /* reset=*/U8X8_PIN_NONE);
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
-TinyPICO tp = TinyPICO();
+USBHIDKeyboard usbKeyboard;
 
 PCF8574 pcf8574RotaryExtension(ENCODER_EXTENSION_ADDR);
 bool isRotaryExtensionConnected = false;
@@ -16,6 +16,7 @@ TaskHandle_t TaskLED;
 TaskHandle_t TaskNetwork;
 TaskHandle_t TaskScreen;
 TaskHandle_t TaskEncoderExtension;
+TaskHandle_t TaskEncoder;
 TaskHandle_t TaskI2CScanner;
 
 // Stucture for key stroke
@@ -44,6 +45,8 @@ RotaryEncoder rotaryExtEncoder1;
 Key rotaryExtKeyMap[3] = {rotaryExtKey1, rotaryExtKey2, rotaryExtKey3};
 RotaryEncoder rotaryExtRotaryEncoderMap[1] = {rotaryExtEncoder1};
 
+ESP32Encoder onBoardEncoder1;
+
 String keyConfigJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
 bool updateKeyInfo = false;
@@ -52,6 +55,7 @@ bool isDetectingLastConnectedDevice = true;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
 RTC_DATA_ATTR byte currentActiveDevice = 0;
 RTC_DATA_ATTR String currentActiveDeviceAddress = "";
+RTC_DATA_ATTR bool isUsbMode = true;
 byte layoutLength = 0;
 String currentLayout = "";
 // For maximum 10 layers
@@ -59,9 +63,9 @@ const short jsonDocSize = 16384;
 size_t tapToggleOrginalLayerIndex = 0;
 bool isTemporaryToggled = false;
 
-byte inputs[] = {23, 19, 18, 5, 32, 33, 25};  // declaring inputs and outputs
+byte inputs[] = {9, 3, 8, 5, 4, 18, 17};  // Column
 const int inputCount = sizeof(inputs) / sizeof(inputs[0]);
-byte outputs[] = {4, 14, 15, 27, 26};  // row
+byte outputs[] = {14, 13, 12, 11, 10};  // Row
 const int outputCount = sizeof(outputs) / sizeof(outputs[0]);
 
 // Auto sleep timer
@@ -106,12 +110,15 @@ bool isScreenSleeping = false;
 String contentTop = "";
 String contentBottom = "";
 // loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5,
-// low battery: 6, sleep: 7, config: 8, caffeinated: 9
+// low battery: 6, sleep: 7, config: 8, caffeinated: 9, locked: 10,
+// usb connected: 11
 int contentIcon = 0;
 
 // Set web server port number to 80
 WebServer server(80);
 ImprovWiFi improvSerial(&Serial);
+
+CRGB leds[NUM_LEDS];
 
 void onImprovWiFiErrorCb(ImprovTypes::Error err) {
     Serial.println("Error: " + String(err));
@@ -137,20 +144,28 @@ void onImprovWiFiConnectedCb(const char *ssid, const char *password) {
 void setup() {
     Serial.begin(BAUD_RATE);
 
+    delay(10);
+
     printSpacer();
 
     setCPUFrequency(240);
 
     printSpacer();
 
+    // Config Voltage ADC Input pin6, pin7
+    adcAttachPin(6);
+    adcAttachPin(7);
+
     Serial.println("Starting Wire...");
-    Wire.begin();
+    Wire.begin(SDA, SCL, 100000);
 
     printSpacer();
 
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
-    bleKeyboard.set_current_active_device(currentActiveDevice);
+    // bleKeyboard.set_current_active_device(currentActiveDevice);
+    usbKeyboard.begin();
+    USB.begin();
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
@@ -166,28 +181,55 @@ void setup() {
 
     printSpacer();
 
-    pcf8574RotaryExtension.encoder(encoderPinA, encoderPinB);
-    pcf8574RotaryExtension.pinMode(encoderSW, INPUT_PULLUP);
-    pcf8574RotaryExtension.pinMode(extensionBtn1, INPUT_PULLUP);
-    pcf8574RotaryExtension.pinMode(extensionBtn2, INPUT_PULLUP);
-    pcf8574RotaryExtension.pinMode(extensionBtn3, INPUT_PULLUP);
-    pcf8574RotaryExtension.setLatency(0);
+    Serial.println("Configuring LEDs...");
 
-    if (pcf8574RotaryExtension.begin()) {
-        Serial.println("Rotary Extension Board initialized");
-        isRotaryExtensionConnected = true;
-    } else {
-        Serial.println("Rotary Extension Board not found");
-        isRotaryExtensionConnected = false;
-    }
+    FastLED.addLeds<WS2812, LED_PIN_DIN, GRB>(leds, NUM_LEDS);
 
-    xTaskCreate(
-        encoderTask,          /* Task function. */
-        "Encoder Task",       /* name of task. */
-        5000,                 /* Stack size of task */
-        NULL,                 /* parameter of the task */
-        2,                    /* priority of the task */
-        &TaskEncoderExtension /* Task handle to keep track of created task */
+    FastLED.setBrightness(5);
+
+    printSpacer();
+
+    Serial.println("Configuring Configuration Buttons...");
+
+    pinMode(CFG_BTN_PIN_1, INPUT_PULLUP);
+    pinMode(CFG_BTN_PIN_2, INPUT_PULLUP);
+
+    printSpacer();
+
+    // pcf8574RotaryExtension.encoder(encoderPinA, encoderPinB);
+    // pcf8574RotaryExtension.pinMode(encoderSW, INPUT_PULLUP);
+    // pcf8574RotaryExtension.pinMode(extensionBtn1, INPUT_PULLUP);
+    // pcf8574RotaryExtension.pinMode(extensionBtn2, INPUT_PULLUP);
+    // pcf8574RotaryExtension.pinMode(extensionBtn3, INPUT_PULLUP);
+    // pcf8574RotaryExtension.setLatency(0);
+
+    // if (pcf8574RotaryExtension.begin()) {
+    //     Serial.println("Rotary Extension Board initialized");
+    //     isRotaryExtensionConnected = true;
+    // } else {
+    //     Serial.println("Rotary Extension Board not found");
+    //     isRotaryExtensionConnected = false;
+    // }
+
+    // xTaskCreate(
+    //     encoderExtBoardTask,      /* Task function. */
+    //     "Encoder Ext Board Task", /* name of task. */
+    //     5000,                     /* Stack size of task */
+    //     NULL,                     /* parameter of the task */
+    //     2,                        /* priority of the task */
+    //     &TaskEncoderExtension /* Task handle to keep track of created task */
+    // );
+
+    ESP32Encoder::useInternalWeakPullResistors = UP;
+
+    onBoardEncoder1.attachHalfQuad(EC_PIN_A, EC_PIN_B);
+
+    xTaskCreate(encoderTask,    /* Task function. */
+                "Encoder Task", /* name of task. */
+                5000,           /* Stack size of task */
+                NULL,           /* parameter of the task */
+                2,              /* priority of the task */
+                &TaskEncoder    /* Task handle to keep track of created task */
     );
 
     printSpacer();
@@ -214,10 +256,8 @@ void setup() {
     StaticJsonDocument<256> doc;
     String configJSON = loadJSONFileAsString("system");
     deserializeJson(doc, configJSON);
-    String address = doc["currentActiveDeviceAddress"];
-    currentActiveDeviceAddress = address;
-    Serial.println("Last connected device BLE address: " +
-                   currentActiveDeviceAddress);
+    // String address = doc["currentActiveDeviceAddress"];
+    // currentActiveDeviceAddress = address;
 
     printSpacer();
 
@@ -238,7 +278,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         ledTask,    /* Task function. */
         "LED Task", /* name of task. */
-        1000,       /* Stack size of task */
+        5000,       /* Stack size of task */
         NULL,       /* parameter of the task */
         1,          /* priority of the task */
         &TaskLED,   /* Task handle to keep track of created task */
@@ -254,13 +294,13 @@ void setup() {
         0);            /* pin task to core 0 */
 
     xTaskCreatePinnedToCore(
-        i2cScannerTask,  /* Task function. */
-        "Screen Task",   /* name of task. */
-        5000,            /* Stack size of task */
-        NULL,            /* parameter of the task */
-        1,               /* priority of the task */
-        &TaskI2CScanner, /* Task handle to keep track of created task */
-        0);              /* pin task to core 0 */
+        i2cScannerTask,     /* Task function. */
+        "I2C Scanner Task", /* name of task. */
+        5000,               /* Stack size of task */
+        NULL,               /* parameter of the task */
+        1,                  /* priority of the task */
+        &TaskI2CScanner,    /* Task handle to keep track of created task */
+        0);                 /* pin task to core 0 */
 
     printSpacer();
 
@@ -320,30 +360,30 @@ void generalTask(void *pvParameters) {
     while (true) {
         checkBattery();
 
-        if (isDetectingLastConnectedDevice && bleKeyboard.isConnected() &&
-            bleKeyboard.getCounnectedCount() > 1) {
-            isDetectingLastConnectedDevice = false;
-            std::array<std::string, 2> addresses =
-                bleKeyboard.getDevicesAddress();
-            for (int i = 0; i < addresses.size(); i++) {
-                if (!currentActiveDeviceAddress.length()) {
-                    currentActiveDeviceAddress = String(addresses[i].c_str());
-                    StaticJsonDocument<128> doc;
-                    if (SPIFFS.begin()) {
-                        File config = SPIFFS.open("/system.json", "w");
-                        doc["currentActiveDeviceAddress"] =
-                            currentActiveDeviceAddress;
-                        serializeJson(doc, config);
-                        config.close();
-                    }
-                }
-                if (currentActiveDeviceAddress.equals(
-                        String(addresses[i].c_str()))) {
-                    currentActiveDevice = i;
-                }
-                bleKeyboard.set_current_active_device(currentActiveDevice);
-            }
-        }
+        // if (isDetectingLastConnectedDevice && bleKeyboard.isConnected() &&
+        //     bleKeyboard.getCounnectedCount() > 1) {
+        // isDetectingLastConnectedDevice = false;
+        // std::array<std::string, 2> addresses =
+        //     bleKeyboard.getDevicesAddress();
+        // for (int i = 0; i < addresses.size(); i++) {
+        //     if (!currentActiveDeviceAddress.length()) {
+        //         currentActiveDeviceAddress = String(addresses[i].c_str());
+        //         StaticJsonDocument<128> doc;
+        //         if (SPIFFS.begin()) {
+        //             File config = SPIFFS.open("/system.json", "w");
+        //             doc["currentActiveDeviceAddress"] =
+        //                 currentActiveDeviceAddress;
+        //             serializeJson(doc, config);
+        //             config.close();
+        //         }
+        //     }
+        //     if (currentActiveDeviceAddress.equals(
+        //             String(addresses[i].c_str()))) {
+        //         currentActiveDevice = i;
+        //     }
+        //     bleKeyboard.set_current_active_device(currentActiveDevice);
+        // }
+        // }
 
         // Update screen info
         if (isGoingToSleep) {
@@ -377,19 +417,33 @@ void generalTask(void *pvParameters) {
             contentTop = networkInfo;
         } else {
             String result = "";
-            bool plugged = digitalRead(9);
-            bool charging = tp.IsChargingBattery();
+            bool plugged = getUSBPowerState();
+            if (!plugged) {
+                isUsbMode = false;
+            }
+            // TODO: .IsChargingBattery();
+            bool charging = false;
             if (plugged && charging) {
                 result = "Charging";
                 contentIcon = 4;
             } else if (plugged) {
-                result = "Plugged in";
+                if (isUsbMode) {
+                    result = "Plugged in [USB]";
+                    contentIcon = 11;
+                } else {
+                    result = "Plugged in [BT]";
+                    contentIcon = 5;
+                }
                 contentIcon = 5;
             } else if (batteryPercentage > 100) {
                 result = "Reading battery...";
             } else {
                 result = "Bat. " + (String)batteryPercentage + "%";
-                contentIcon = 1;
+                if (isUsbMode) {
+                    contentIcon = 11;
+                } else {
+                    contentIcon = 1;
+                }
             }
 
             contentTop = result;
@@ -398,16 +452,15 @@ void generalTask(void *pvParameters) {
         if (isSwitchingBootMode) {
             if (!bootWiFiMode) {
                 contentIcon = 8;
-                contentBottom = "=> WiFi Mode <=";
+                contentBottom = "> WiFi Mode <  ";
             } else {
-                contentBottom = "=> Normal Mode <=";
+                contentBottom = "> Standard Mode <";
             }
         }
 
         // Show connecting message when BLE is disconnected
-        while (!bleKeyboard.isConnected()) {
+        while (!isUsbMode && !bleKeyboard.isConnected()) {
             contentBottom = "Connecting BLE..";
-            // breathLEDAnimation();
             checkIdle();
             delay(100);
         }
@@ -429,7 +482,7 @@ void generalTask(void *pvParameters) {
 
         // Idle message
         if (currentMillis - sleepPreviousMillis > 5000) {
-            contentBottom = "Layout: " + currentLayout;
+            contentBottom = "@" + currentLayout;
         }
 
         // Record boot time every 5 seconds
@@ -451,7 +504,44 @@ void generalTask(void *pvParameters) {
 void ledTask(void *pvParameters) {
     while (true) {
         currentMillis = millis();
-        showLowBatteryWarning();
+
+        // Low battery LED blink
+        if (isLowBattery) {
+            if (currentMillis - ledPreviousMillis > 1000 &&
+                currentMillis - ledPreviousMillis <= 1200) {
+                leds[0] = CRGB::Black;
+                FastLED.show();
+            } else if (currentMillis - ledPreviousMillis > 1200 &&
+                       currentMillis - ledPreviousMillis <= 1300) {
+                leds[0] = CRGB::Red;
+                FastLED.show();
+            } else if (currentMillis - ledPreviousMillis > 1300 &&
+                       currentMillis - ledPreviousMillis <= 1500) {
+                leds[0] = CRGB::Black;
+                FastLED.show();
+            } else if (currentMillis - ledPreviousMillis > 1500) {
+                leds[0] = CRGB::Red;
+                FastLED.show();
+                ledPreviousMillis = currentMillis;
+            }
+        } else {
+            if (isScreenDisabled || isScreenSleeping) {
+                leds[0] = CRGB::Green;
+            } else if (!bleKeyboard.isConnected() && !isUsbMode) {
+                leds[0] = CRGB::Blue;
+                FastLED.show();
+                delay(300);
+                leds[0] = CRGB::Black;
+                FastLED.show();
+                delay(300);
+            } else if (getUSBPowerState()) {
+                leds[0] = CRGB::Green;
+            } else {
+                leds[0] = CRGB::Black;
+            }
+            FastLED.show();
+        }
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
@@ -475,7 +565,66 @@ void networkTask(void *pvParameters) {
 void screenTask(void *pvParameters) {
     while (true) {
         renderScreen();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+}
+
+/**
+ * Onboard rotary encoder scanning
+ *
+ */
+void encoderTask(void *pvParameters) {
+    long int value = onBoardEncoder1.getCount();
+    long int lastValue = value;
+    bool trigger = false;
+    String direction = "";
+
+    while (true) {
+        value = onBoardEncoder1.getCount();
+
+        if (value != lastValue) {
+            if (value > lastValue) {  // CCW
+                direction = "CCW";
+            } else if (value < lastValue) {  // CW
+                direction = "CW";
+            }
+
+            lastValue = value;
+
+            if (trigger) {
+                trigger = false;
+            } else {
+                trigger = true;
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+                continue;
+            }
+
+            if (direction.equals("CCW")) {
+                resetIdle();
+                if (isUsbMode) {
+                    usbKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                    usbKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                } else {
+                    bleKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                    bleKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                }
+                updateKeyInfo = true;
+                currentKeyInfo = rotaryExtRotaryEncoderMap[0].rotaryCCWInfo;
+            } else if (direction.equals("CW")) {
+                resetIdle();
+                if (isUsbMode) {
+                    usbKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCW);
+                    usbKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCW);
+                } else {
+                    bleKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCW);
+                    bleKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCW);
+                }
+                updateKeyInfo = true;
+                currentKeyInfo = rotaryExtRotaryEncoderMap[0].rotaryCWInfo;
+            }
+        }
+
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
@@ -483,7 +632,7 @@ void screenTask(void *pvParameters) {
  * Rotary encoder related tasks
  *
  */
-void encoderTask(void *pvParameters) {
+void encoderExtBoardTask(void *pvParameters) {
     int value = 0;
     bool btnState = false;
     bool pinAState = false;
@@ -631,21 +780,21 @@ void encoderTask(void *pvParameters) {
 
 void i2cScannerTask(void *pvParameters) {
     while (true) {
-        byte error;
-        byte devices[1] = {ENCODER_EXTENSION_ADDR};
-        for (int i : devices) {
-            Wire.beginTransmission(devices[i]);
-            error = Wire.endTransmission();
+        // byte error;
+        // byte devices[1] = {ENCODER_EXTENSION_ADDR};
+        // for (byte i : devices) {
+        //     Wire.beginTransmission(devices[i]);
+        //     error = Wire.endTransmission();
 
-            if (devices[i] == ENCODER_EXTENSION_ADDR) {
-                if (error == 0)
-                    isRotaryExtensionConnected = true;
-                else
-                    isRotaryExtensionConnected = false;
-            }
-        }
+        //     if (devices[i] == ENCODER_EXTENSION_ADDR) {
+        //         if (error == 0)
+        //             isRotaryExtensionConnected = true;
+        //         else
+        //             isRotaryExtensionConnected = false;
+        //     }
+        // }
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -658,6 +807,12 @@ void loop() {
     if (keymapsNeedsUpdate) {
         updateKeymaps();
     }
+
+    if (isGoingToSleep) {
+        return;
+    }
+
+    // Keypad scan
     for (int r = 0; r < ROWS; r++) {
         digitalWrite(outputs[r], LOW);  // Setting one row low
         for (int c = 0; c < COLS; c++) {
@@ -669,7 +824,10 @@ void loop() {
                     } else if (r == 1 && c == 0) {
                         switchBootMode();
                     } else if (r == 3 && c == 0) {
-                        switchDevice();
+                        isUsbMode = !isUsbMode;
+                        usbKeyboard.releaseAll();
+                        bleKeyboard.releaseAll();
+                        delay(300);
                     } else if (r == 4 && c == 4) {
                         switchLayout();
                     } else if (r == 3 && c == 3) {
@@ -719,7 +877,42 @@ void loop() {
         digitalWrite(outputs[r], HIGH);  // Setting the row back to high
         delayMicroseconds(10);
     }
-    delay(10);
+
+    // Read Bi-Directional Switch input
+    if (digitalRead(BD_SW_CW) == ACTIVE) {
+        resetIdle();
+        switchLayout(currentLayoutIndex + 1);
+        while (digitalRead(BD_SW_CW) == ACTIVE) {
+            delay(10);
+        }
+    } else if (digitalRead(BD_SW_CCW) == ACTIVE) {
+        resetIdle();
+        switchLayout(currentLayoutIndex - 1);
+        while (digitalRead(BD_SW_CCW) == ACTIVE) {
+            delay(10);
+        }
+    } else if (digitalRead(BD_SW_PUSH) == ACTIVE) {
+        resetIdle();
+        switchLayout(0);
+        while (digitalRead(BD_SW_PUSH) == ACTIVE) {
+            delay(10);
+        }
+    }
+
+    // Read CFG Buttons
+    if (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
+        resetIdle();
+        switchBootMode();
+        while (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
+            delay(10);
+        }
+    } else if (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
+        resetIdle();
+        isUsbMode = !isUsbMode;
+        while (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
+            delay(10);
+        }
+    }
 }
 
 /**
@@ -754,6 +947,11 @@ void initKeys() {
     for (int i = 0; i < inputCount; i++) {
         pinMode(inputs[i], INPUT_PULLUP);
     }
+
+    // Bi-Direction (/w Push) Switch
+    pinMode(BD_SW_CW, INPUT_PULLUP);
+    pinMode(BD_SW_CCW, INPUT_PULLUP);
+    pinMode(BD_SW_PUSH, INPUT_PULLUP);
 
     // Assign keymap data
     for (int r = 0; r < ROWS; r++) {
@@ -800,7 +998,7 @@ void initKeys() {
     // Show layout title on screen
     String str = doc["keyConfig"][currentLayoutIndex]["title"];
     currentLayout = str;
-    contentBottom = "Layout: " + currentLayout;
+    contentBottom = "@" + currentLayout;
 
     EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
     EEPROM.commit();
@@ -862,7 +1060,11 @@ void keyPress(Key &key) {
         isFnKeyPressed = true;
     }
     if (key.state == false && !isOutputLocked) {
-        bleKeyboard.press(key.keyStroke);
+        if (isUsbMode) {
+            usbKeyboard.press(key.keyStroke);
+        } else {
+            bleKeyboard.press(key.keyStroke);
+        }
     }
     key.state = true;
     updateKeyInfo = true;
@@ -874,7 +1076,11 @@ bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState) {
         isFnKeyPressed = true;
     }
     if (keyState == false && !isOutputLocked) {
-        bleKeyboard.press(keyStroke);
+        if (isUsbMode) {
+            usbKeyboard.press(keyStroke);
+        } else {
+            bleKeyboard.press(keyStroke);
+        }
     }
     keyState = true;
     updateKeyInfo = true;
@@ -892,7 +1098,11 @@ void keyRelease(Key &key) {
         isFnKeyPressed = false;
     }
     if (key.state == true && !isOutputLocked) {
-        bleKeyboard.release(key.keyStroke);
+        if (isUsbMode) {
+            usbKeyboard.release(key.keyStroke);
+        } else {
+            bleKeyboard.release(key.keyStroke);
+        }
     }
     key.state = false;
     return;
@@ -903,7 +1113,11 @@ bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState) {
         isFnKeyPressed = false;
     }
     if (keyState == true && !isOutputLocked) {
-        bleKeyboard.release(keyStroke);
+        if (isUsbMode) {
+            usbKeyboard.release(keyStroke);
+        } else {
+            bleKeyboard.release(keyStroke);
+        }
     }
     keyState = false;
     return keyState;
@@ -923,15 +1137,31 @@ void macroPress(Macro &macro) {
     if (macro.type == 0) {
         size_t length = sizeof(macro.keyStrokes);
         for (size_t i = 0; i < length; i++) {
-            bleKeyboard.press(macro.keyStrokes[i]);
+            if (isUsbMode) {
+                usbKeyboard.press(macro.keyStrokes[i]);
+            } else {
+                bleKeyboard.press(macro.keyStrokes[i]);
+            }
             delayMicroseconds(10);
         }
         delay(50);
-        bleKeyboard.releaseAll();
+        if (isUsbMode) {
+            usbKeyboard.releaseAll();
+        } else {
+            bleKeyboard.releaseAll();
+        }
     } else if (macro.type == 1) {
-        bleKeyboard.print(macro.stringContent);
+        if (isUsbMode) {
+            usbKeyboard.print(macro.stringContent);
+        } else {
+            bleKeyboard.print(macro.stringContent);
+        }
     } else if (macro.type == 2) {
-        bleKeyboard.println(macro.stringContent);
+        if (isUsbMode) {
+            usbKeyboard.println(macro.stringContent);
+        } else {
+            bleKeyboard.println(macro.stringContent);
+        }
     }
     delay(100);
 }
@@ -982,6 +1212,11 @@ void switchLayout() {
 
 // overload switchLayout() to accept layout index as parameter
 void switchLayout(int layoutIndex) {
+    if (layoutIndex > layoutLength - 1) {
+        layoutIndex = 0;
+    } else if (layoutIndex < 0) {
+        layoutIndex = layoutLength - 1;
+    }
     currentLayoutIndex = layoutIndex;
     initKeys();
 }
@@ -1003,32 +1238,6 @@ int findLayoutIndex(String layoutName) {
         }
     }
     return -1;
-}
-
-/**
- * Switch active bluetooth device
- *
- */
-void switchDevice() {
-    if (bleKeyboard.getCounnectedCount() > 1) {
-        currentActiveDevice = currentActiveDevice == 0 ? 1 : 0;
-    } else {
-        currentActiveDevice = 0;
-    }
-    std::array<std::string, 2> addresses = bleKeyboard.getDevicesAddress();
-    currentActiveDeviceAddress = String(addresses[currentActiveDevice].c_str());
-    bleKeyboard.set_current_active_device(currentActiveDevice);
-    contentBottom = "Device " + (String)currentActiveDevice;
-    Serial.println("Switching to device " + (String)currentActiveDevice);
-    Serial.println("Address: " + (String)currentActiveDeviceAddress);
-    if (SPIFFS.begin()) {
-        StaticJsonDocument<128> doc;
-        File config = SPIFFS.open("/system.json", "w");
-        doc["currentActiveDeviceAddress"] = currentActiveDeviceAddress;
-        serializeJson(doc, config);
-        config.close();
-    }
-    delay(300);
 }
 
 /**
@@ -1058,25 +1267,6 @@ void setCPUFrequency(int freq) {
     Serial.begin(BAUD_RATE);
     setCpuFrequencyMhz(freq);
     Serial.println("CPU clock speed set to " + String(freq) + "Mhz");
-}
-
-/**
- * Breath LED Animation
- *
- */
-void breathLEDAnimation() {
-    int brightness = 0;
-    tp.DotStar_SetPower(true);
-    // Brighten LED step by step
-    for (; brightness <= 50; brightness++) {
-        tp.DotStar_SetPixelColor(0, brightness, 0);
-        delayMicroseconds(5);
-    }
-    // Dimming LED step by step
-    for (; brightness >= 0; brightness--) {
-        delayMicroseconds(5);
-        tp.DotStar_SetPixelColor(0, brightness, 0);
-    }
 }
 
 /**
@@ -1137,6 +1327,9 @@ void renderScreen() {
         case 10:
             u8g2.drawGlyph(0, 16, 0xA5);
             break;
+        case 11:
+            u8g2.drawGlyph(0, 16, 0xDE);
+            break;
         default:
             u8g2.drawGlyph(0, 16, 0x00);
     }
@@ -1160,14 +1353,19 @@ void renderScreen() {
  *
  */
 int getBatteryPercentage() {
-    const float minVoltage = 3.3, fullVolatge = 4.1;
-    float batteryVoltage = tp.GetBatteryVoltage();
+    const float minVoltage = 2.8, fullVolatge = 3.8;
+
+    int raw = analogRead(6);
+    float batteryVoltage = raw * V_REF / 4096.0 * VOLTAGE_DIVIDER_RATIO;
 
     Serial.println((String) "Battery Voltage: " + batteryVoltage);
 
     // Convert to percentage
     float percentage =
         (batteryVoltage - minVoltage) / (fullVolatge - minVoltage) * 100;
+
+    // Percentage step by 5
+    percentage = round(percentage / 5) * 5;
 
     // Update device's battery level
     bleKeyboard.setBatteryLevel(percentage);
@@ -1176,16 +1374,41 @@ int getBatteryPercentage() {
 }
 
 /**
+ * Return true if USB bus power is detected
+ *
+ */
+bool getUSBPowerState() {
+    int rawUsb = analogRead(7);
+    float voltageUsb = rawUsb * V_REF / 4096.0 * VOLTAGE_DIVIDER_RATIO;
+    if (voltageUsb > 4) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
  * Enter deep sleep mode
  *
  */
 void goSleeping() {
     isGoingToSleep = true;
-    gpio_pulldown_en(GPIO_NUM_15);
-    // gpio_pulldown_en(GPIO_NUM_27);
-    // gpio_pulldown_en(GPIO_NUM_26);
     delay(1000);
+    // Column pins
+    rtc_gpio_pulldown_dis(GPIO_NUM_5);
+    rtc_gpio_pullup_en(GPIO_NUM_5);
+    rtc_gpio_isolate(GPIO_NUM_5);
+    rtc_gpio_pulldown_dis(GPIO_NUM_4);
+    rtc_gpio_pullup_en(GPIO_NUM_4);
+    rtc_gpio_isolate(GPIO_NUM_4);
+    // Row pins
+    rtc_gpio_pullup_dis(GPIO_NUM_12);
+    rtc_gpio_pulldown_en(GPIO_NUM_12);
     clearDisplay = true;
+    for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = CRGB::Black;
+    }
+    FastLED.show();
     delay(500);
     esp_deep_sleep_start();
 }
@@ -1239,40 +1462,6 @@ void checkBattery() {
         }
     }
     return;
-}
-
-/**
- * Blink LED to indicate that battery is low
- *
- */
-void showLowBatteryWarning() {
-    if (!isLowBattery) {
-        if (bleKeyboard.isConnected()) {
-            if ((isScreenDisabled || isScreenSleeping) && !isLowBattery) {
-                tp.DotStar_SetPower(true);
-                tp.DotStar_SetBrightness(1);
-                tp.DotStar_SetPixelColor(0, 0, 255);
-            } else {
-                tp.DotStar_SetPower(false);
-            }
-        }
-        return;
-    }
-    tp.DotStar_SetPower(true);
-    if (currentMillis - ledPreviousMillis > 1000 &&
-        currentMillis - ledPreviousMillis <= 1200) {
-        tp.DotStar_SetBrightness(5);
-        tp.DotStar_SetPixelColor(255, 0, 0);
-    } else if (currentMillis - ledPreviousMillis > 1200 &&
-               currentMillis - ledPreviousMillis <= 1300) {
-        tp.DotStar_SetPixelColor(0, 0, 0);
-    } else if (currentMillis - ledPreviousMillis > 1300 &&
-               currentMillis - ledPreviousMillis <= 1500) {
-        tp.DotStar_SetPixelColor(255, 0, 0);
-    } else if (currentMillis - ledPreviousMillis > 1700) {
-        tp.DotStar_SetPixelColor(0, 0, 0);
-        ledPreviousMillis = currentMillis;
-    }
 }
 
 /**

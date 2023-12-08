@@ -200,9 +200,9 @@ void BleKeyboard::set_current_active_device(uint16_t currentDeviceIndex) {
              this->currentActiveDevice);
 }
 
-void BleKeyboard::sendReport(KeyReport* keys) {
+void BleKeyboard::sendReport(BLEKeyReport* keys) {
     if (this->isConnected()) {
-        this->inputKeyboard->setValue((uint8_t*)keys, sizeof(KeyReport));
+        this->inputKeyboard->setValue((uint8_t*)keys, sizeof(BLEKeyReport));
         this->inputKeyboard->notify(this->currentActiveDevice);
 #if defined(USE_NIMBLE)
         // vTaskDelay(delayTicks);
@@ -211,9 +211,9 @@ void BleKeyboard::sendReport(KeyReport* keys) {
     }
 }
 
-void BleKeyboard::sendReport(MediaKeyReport* keys) {
+void BleKeyboard::sendReport(MediaBLEKeyReport* keys) {
     if (this->isConnected()) {
-        this->inputMediaKeys->setValue((uint8_t*)keys, sizeof(MediaKeyReport));
+        this->inputMediaKeys->setValue((uint8_t*)keys, sizeof(MediaBLEKeyReport));
         this->inputMediaKeys->notify(this->currentActiveDevice);
 #if defined(USE_NIMBLE)
         // vTaskDelay(delayTicks);
@@ -368,7 +368,7 @@ size_t BleKeyboard::press(uint8_t k) {
     if (k >= 136) {  // it's a non-printing key (not a modifier)
         k = k - 136;
     } else if (k >= 128) {  // it's a modifier key
-        _keyReport.modifiers |= (1 << (k - 128));
+        _BLEKeyReport.modifiers |= (1 << (k - 128));
         k = 0;
     } else {  // it's a printing key
         k = pgm_read_byte(_asciimap + k);
@@ -378,19 +378,19 @@ size_t BleKeyboard::press(uint8_t k) {
         }
         if (k & 0x80) {  // it's a capital letter or other character reached
                          // with shift
-            _keyReport.modifiers |= 0x02;  // the left shift modifier
+            _BLEKeyReport.modifiers |= 0x02;  // the left shift modifier
             k &= 0x7F;
         }
     }
 
     // Add k to the key report only if it's not already present
     // and if there is an empty slot.
-    if (_keyReport.keys[0] != k && _keyReport.keys[1] != k &&
-        _keyReport.keys[2] != k && _keyReport.keys[3] != k &&
-        _keyReport.keys[4] != k && _keyReport.keys[5] != k) {
+    if (_BLEKeyReport.keys[0] != k && _BLEKeyReport.keys[1] != k &&
+        _BLEKeyReport.keys[2] != k && _BLEKeyReport.keys[3] != k &&
+        _BLEKeyReport.keys[4] != k && _BLEKeyReport.keys[5] != k) {
         for (i = 0; i < 6; i++) {
-            if (_keyReport.keys[i] == 0x00) {
-                _keyReport.keys[i] = k;
+            if (_BLEKeyReport.keys[i] == 0x00) {
+                _BLEKeyReport.keys[i] = k;
                 break;
             }
         }
@@ -399,19 +399,19 @@ size_t BleKeyboard::press(uint8_t k) {
             return 0;
         }
     }
-    sendReport(&_keyReport);
+    sendReport(&_BLEKeyReport);
     return 1;
 }
 
-size_t BleKeyboard::press(const MediaKeyReport k) {
+size_t BleKeyboard::press(const MediaBLEKeyReport k) {
     uint16_t k_16 = k[1] | (k[0] << 8);
-    uint16_t mediaKeyReport_16 = _mediaKeyReport[1] | (_mediaKeyReport[0] << 8);
+    uint16_t mediaBLEKeyReport_16 = _mediaBLEKeyReport[1] | (_mediaBLEKeyReport[0] << 8);
 
-    mediaKeyReport_16 |= k_16;
-    _mediaKeyReport[0] = (uint8_t)((mediaKeyReport_16 & 0xFF00) >> 8);
-    _mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
+    mediaBLEKeyReport_16 |= k_16;
+    _mediaBLEKeyReport[0] = (uint8_t)((mediaBLEKeyReport_16 & 0xFF00) >> 8);
+    _mediaBLEKeyReport[1] = (uint8_t)(mediaBLEKeyReport_16 & 0x00FF);
 
-    sendReport(&_mediaKeyReport);
+    sendReport(&_mediaBLEKeyReport);
     return 1;
 }
 
@@ -423,7 +423,7 @@ size_t BleKeyboard::release(uint8_t k) {
     if (k >= 136) {  // it's a non-printing key (not a modifier)
         k = k - 136;
     } else if (k >= 128) {  // it's a modifier key
-        _keyReport.modifiers &= ~(1 << (k - 128));
+        _BLEKeyReport.modifiers &= ~(1 << (k - 128));
         k = 0;
     } else {  // it's a printing key
         k = pgm_read_byte(_asciimap + k);
@@ -432,7 +432,7 @@ size_t BleKeyboard::release(uint8_t k) {
         }
         if (k & 0x80) {  // it's a capital letter or other character reached
                          // with shift
-            _keyReport.modifiers &= ~(0x02);  // the left shift modifier
+            _BLEKeyReport.modifiers &= ~(0x02);  // the left shift modifier
             k &= 0x7F;
         }
     }
@@ -441,37 +441,37 @@ size_t BleKeyboard::release(uint8_t k) {
     // Check all positions in case the key is present more than once (which it
     // shouldn't be)
     for (i = 0; i < 6; i++) {
-        if (0 != k && _keyReport.keys[i] == k) {
-            _keyReport.keys[i] = 0x00;
+        if (0 != k && _BLEKeyReport.keys[i] == k) {
+            _BLEKeyReport.keys[i] = 0x00;
         }
     }
 
-    sendReport(&_keyReport);
+    sendReport(&_BLEKeyReport);
     return 1;
 }
 
-size_t BleKeyboard::release(const MediaKeyReport k) {
+size_t BleKeyboard::release(const MediaBLEKeyReport k) {
     uint16_t k_16 = k[1] | (k[0] << 8);
-    uint16_t mediaKeyReport_16 = _mediaKeyReport[1] | (_mediaKeyReport[0] << 8);
-    mediaKeyReport_16 &= ~k_16;
-    _mediaKeyReport[0] = (uint8_t)((mediaKeyReport_16 & 0xFF00) >> 8);
-    _mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
+    uint16_t mediaBLEKeyReport_16 = _mediaBLEKeyReport[1] | (_mediaBLEKeyReport[0] << 8);
+    mediaBLEKeyReport_16 &= ~k_16;
+    _mediaBLEKeyReport[0] = (uint8_t)((mediaBLEKeyReport_16 & 0xFF00) >> 8);
+    _mediaBLEKeyReport[1] = (uint8_t)(mediaBLEKeyReport_16 & 0x00FF);
 
-    sendReport(&_mediaKeyReport);
+    sendReport(&_mediaBLEKeyReport);
     return 1;
 }
 
 void BleKeyboard::releaseAll(void) {
-    _keyReport.keys[0] = 0;
-    _keyReport.keys[1] = 0;
-    _keyReport.keys[2] = 0;
-    _keyReport.keys[3] = 0;
-    _keyReport.keys[4] = 0;
-    _keyReport.keys[5] = 0;
-    _keyReport.modifiers = 0;
-    _mediaKeyReport[0] = 0;
-    _mediaKeyReport[1] = 0;
-    sendReport(&_keyReport);
+    _BLEKeyReport.keys[0] = 0;
+    _BLEKeyReport.keys[1] = 0;
+    _BLEKeyReport.keys[2] = 0;
+    _BLEKeyReport.keys[3] = 0;
+    _BLEKeyReport.keys[4] = 0;
+    _BLEKeyReport.keys[5] = 0;
+    _BLEKeyReport.modifiers = 0;
+    _mediaBLEKeyReport[0] = 0;
+    _mediaBLEKeyReport[1] = 0;
+    sendReport(&_BLEKeyReport);
 }
 
 size_t BleKeyboard::write(uint8_t c) {
@@ -481,7 +481,7 @@ size_t BleKeyboard::write(uint8_t c) {
                // always returns 1
 }
 
-size_t BleKeyboard::write(const MediaKeyReport c) {
+size_t BleKeyboard::write(const MediaBLEKeyReport c) {
     uint16_t p = press(c);  // Keydown
     release(c);             // Keyup
     return p;  // just return the result of press() since release() almost

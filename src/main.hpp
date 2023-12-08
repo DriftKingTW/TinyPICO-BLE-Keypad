@@ -2,15 +2,23 @@
 #include <ArduinoJson.h>
 #include <BleKeyboard.h>
 #include <EEPROM.h>
+#include <ESP32Encoder.h>
 #include <ESPmDNS.h>
+#include <FastLED.h>
 #include <ImprovWiFiLibrary.h>
 #include <PCF8574.h>
 #include <SPIFFS.h>
-#include <TinyPICO.h>
+
+#include "USB.h"
+#include "USBHIDKeyboard.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
+// #include <TinyPICO.h>
 #include <U8g2lib.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <driver/rtc_io.h>
 
 #include <algorithm>
 #include <animation.hpp>
@@ -26,17 +34,37 @@ using namespace std;
 #define EEPROM_SIZE 1
 #define EEPROM_ADDR_LAYOUT 0
 
-#define BLE_NAME "TinyPICO BLE"
+#define BLE_NAME "Schnell Keypad"
 #define AUTHOR "DriftKingTW"
 
 #define ACTIVE LOW
-#define WAKEUP_KEY_BITMAP 0x8000
+#define WAKEUP_KEY_BITMAP 0x1000  // Pin 12
 
-#define AP_SSID "TinyPICO Keypad WLAN"
-#define MDNS_NAME "tp-keypad"
+#define AP_SSID "Schnell Keypad WLAN"
+#define MDNS_NAME "Schnell"
 
 #define ROWS 5
 #define COLS 7
+
+#define SCL 15
+#define SDA 16
+
+#define VOLTAGE_DIVIDER_RATIO 2.0  // For 100K/100K divider
+#define V_REF 3.3                  // Reference voltage for ADC
+#define BATT_PIN 6
+
+#define BD_SW_CW 47
+#define BD_SW_CCW 48
+#define BD_SW_PUSH 21
+
+#define EC_PIN_A 45
+#define EC_PIN_B 46
+
+#define LED_PIN_DIN 38
+#define NUM_LEDS 1
+
+#define CFG_BTN_PIN_1 2
+#define CFG_BTN_PIN_2 1
 
 // ====== Extension Board Pin Definition ======
 
@@ -81,6 +109,7 @@ void generalTask(void *);
 void networkTask(void *);
 void screenTask(void *);
 void ICACHE_RAM_ATTR encoderTask(void *);
+void ICACHE_RAM_ATTR encoderExtBoardTask(void *);
 void i2cScannerTask(void *);
 
 // Keyboard
@@ -110,8 +139,8 @@ void resetIdle();
 void goSleeping();
 int getBatteryPercentage();
 void breathLEDAnimation();
-void showLowBatteryWarning();
 void setCPUFrequency(int freq);
+bool getUSBPowerState();
 
 // File Management
 String loadJSONFileAsString(String filename);
