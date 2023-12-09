@@ -893,18 +893,18 @@ void loop() {
         while (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
             delay(10);
             if (longPressCounter > 100) {
-                switchBootMode();
+                goSleeping();
             }
             longPressCounter++;
         }
-        isCaffeinated = !isCaffeinated;
+        isOutputLocked = !isOutputLocked;
     } else if (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
         resetIdle();
         int longPressCounter = 0;
         while (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
             delay(10);
             if (longPressCounter > 100) {
-                goSleeping();
+                switchBootMode();
             }
             longPressCounter++;
         }
@@ -1464,7 +1464,8 @@ void switchBootMode() {
  */
 void checkIdle() {
     if (!isCaffeinated &&
-        currentMillis - sleepPreviousMillis > SLEEP_INTERVAL) {
+        currentMillis - sleepPreviousMillis > SLEEP_INTERVAL &&
+        getUSBPowerState()) {
         goSleeping();
     } else if (!isCaffeinated &&
                currentMillis - sleepPreviousMillis > SCREEN_SLEEP_INTERVAL) {
