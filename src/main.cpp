@@ -3,8 +3,7 @@
 RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR bool bootWiFiMode = false;
 
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0,
-                                            /* reset=*/U8X8_PIN_NONE);
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
 USBHIDKeyboard usbKeyboard;
 
@@ -17,7 +16,7 @@ TaskHandle_t TaskNetwork;
 TaskHandle_t TaskScreen;
 TaskHandle_t TaskEncoderExtension;
 TaskHandle_t TaskEncoder;
-TaskHandle_t TaskI2CScanner;
+TaskHandle_t TaskI2C;
 
 // Stucture for key stroke
 Key key1, key2, key3, key4, key5, key6, key7, key8, key9, key10, key11, key12,
@@ -38,14 +37,14 @@ Key keyMap[ROWS][COLS] = {{key1, key2, key3, key4, key5, key6, dummy},
                           {key14, key15, key16, key17, key18, key19, dummy},
                           {key20, key21, key22, key23, key24, key25, key26},
                           {key27, key28, key29, dummy, key30, key31, dummy}};
-// Rotray Extnesion
-Key rotaryExtKey1, rotaryExtKey2, rotaryExtKey3;
-RotaryEncoder rotaryExtEncoder1;
 
-Key rotaryExtKeyMap[3] = {rotaryExtKey1, rotaryExtKey2, rotaryExtKey3};
-RotaryEncoder rotaryExtRotaryEncoderMap[1] = {rotaryExtEncoder1};
+// Rotray Extnesion ( 3 keys + 1 rotary encoder)
+Key rotaryExtKeyMap[3] = {Key(), Key(), Key()};
+RotaryEncoderConfig rotaryExtRotaryEncoders[1] = {RotaryEncoderConfig()};
 
-ESP32Encoder onBoardEncoder1;
+// Onboard Rotary Encoder
+ESP32Encoder onboardEncoders[1] = {ESP32Encoder()};
+RotaryEncoderConfig onboardRotaryEncoders[1] = {RotaryEncoderConfig()};
 
 String keyConfigJSON = "", macroMapJSON = "";
 String currentKeyInfo = "";
@@ -157,7 +156,7 @@ void setup() {
     adcAttachPin(7);
 
     Serial.println("Starting Wire...");
-    Wire.begin(SDA, SCL, 100000);
+    Wire.begin(SDA, SCL, 400000);
 
     printSpacer();
 
@@ -196,33 +195,33 @@ void setup() {
 
     printSpacer();
 
-    // pcf8574RotaryExtension.encoder(encoderPinA, encoderPinB);
-    // pcf8574RotaryExtension.pinMode(encoderSW, INPUT_PULLUP);
-    // pcf8574RotaryExtension.pinMode(extensionBtn1, INPUT_PULLUP);
-    // pcf8574RotaryExtension.pinMode(extensionBtn2, INPUT_PULLUP);
-    // pcf8574RotaryExtension.pinMode(extensionBtn3, INPUT_PULLUP);
-    // pcf8574RotaryExtension.setLatency(0);
+    pcf8574RotaryExtension.encoder(encoderPinA, encoderPinB);
+    pcf8574RotaryExtension.pinMode(encoderSW, INPUT_PULLUP);
+    pcf8574RotaryExtension.pinMode(extensionBtn1, INPUT_PULLUP);
+    pcf8574RotaryExtension.pinMode(extensionBtn2, INPUT_PULLUP);
+    pcf8574RotaryExtension.pinMode(extensionBtn3, INPUT_PULLUP);
+    pcf8574RotaryExtension.setLatency(0);
 
-    // if (pcf8574RotaryExtension.begin()) {
-    //     Serial.println("Rotary Extension Board initialized");
-    //     isRotaryExtensionConnected = true;
-    // } else {
-    //     Serial.println("Rotary Extension Board not found");
-    //     isRotaryExtensionConnected = false;
-    // }
+    if (pcf8574RotaryExtension.begin()) {
+        Serial.println("Rotary Extension Board initialized");
+        isRotaryExtensionConnected = true;
+    } else {
+        Serial.println("Rotary Extension Board not found");
+        isRotaryExtensionConnected = false;
+    }
 
-    // xTaskCreate(
-    //     encoderExtBoardTask,      /* Task function. */
-    //     "Encoder Ext Board Task", /* name of task. */
-    //     5000,                     /* Stack size of task */
-    //     NULL,                     /* parameter of the task */
-    //     2,                        /* priority of the task */
-    //     &TaskEncoderExtension /* Task handle to keep track of created task */
-    // );
+    xTaskCreate(
+        encoderExtBoardTask,      /* Task function. */
+        "Encoder Ext Board Task", /* name of task. */
+        5000,                     /* Stack size of task */
+        NULL,                     /* parameter of the task */
+        2,                        /* priority of the task */
+        &TaskEncoderExtension /* Task handle to keep track of created task */
+    );
 
     ESP32Encoder::useInternalWeakPullResistors = UP;
 
-    onBoardEncoder1.attachHalfQuad(EC_PIN_A, EC_PIN_B);
+    onboardEncoders[0].attachHalfQuad(EC_PIN_A, EC_PIN_B);
 
     xTaskCreate(encoderTask,    /* Task function. */
                 "Encoder Task", /* name of task. */
@@ -285,22 +284,13 @@ void setup() {
         0);         /* pin task to core 0 */
 
     xTaskCreatePinnedToCore(
-        screenTask,    /* Task function. */
-        "Screen Task", /* name of task. */
-        5000,          /* Stack size of task */
-        NULL,          /* parameter of the task */
-        1,             /* priority of the task */
-        &TaskScreen,   /* Task handle to keep track of created task */
-        0);            /* pin task to core 0 */
-
-    xTaskCreatePinnedToCore(
-        i2cScannerTask,     /* Task function. */
-        "I2C Scanner Task", /* name of task. */
-        5000,               /* Stack size of task */
-        NULL,               /* parameter of the task */
-        1,                  /* priority of the task */
-        &TaskI2CScanner,    /* Task handle to keep track of created task */
-        0);                 /* pin task to core 0 */
+        i2cTask,             /* Task function. */
+        "I2C Related Tasks", /* name of task. */
+        5000,                /* Stack size of task */
+        NULL,                /* parameter of the task */
+        1,                   /* priority of the task */
+        &TaskI2C,            /* Task handle to keep track of created task */
+        0);                  /* pin task to core 0 */
 
     printSpacer();
 
@@ -559,28 +549,17 @@ void networkTask(void *pvParameters) {
 }
 
 /**
- * OLED screen related tasks
- *
- */
-void screenTask(void *pvParameters) {
-    while (true) {
-        renderScreen();
-        vTaskDelay(50 / portTICK_PERIOD_MS);
-    }
-}
-
-/**
  * Onboard rotary encoder scanning
  *
  */
 void encoderTask(void *pvParameters) {
-    long int value = onBoardEncoder1.getCount();
+    long int value = onboardEncoders[0].getCount();
     long int lastValue = value;
     bool trigger = false;
     String direction = "";
 
     while (true) {
-        value = onBoardEncoder1.getCount();
+        value = onboardEncoders[0].getCount();
 
         if (value != lastValue) {
             if (value > lastValue) {  // CCW
@@ -602,25 +581,25 @@ void encoderTask(void *pvParameters) {
             if (direction.equals("CCW")) {
                 resetIdle();
                 if (isUsbMode) {
-                    usbKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCCW);
-                    usbKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                    usbKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
+                    usbKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
                 } else {
-                    bleKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCCW);
-                    bleKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                    bleKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
+                    bleKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
                 }
                 updateKeyInfo = true;
-                currentKeyInfo = rotaryExtRotaryEncoderMap[0].rotaryCCWInfo;
+                currentKeyInfo = onboardRotaryEncoders[0].rotaryCCWInfo;
             } else if (direction.equals("CW")) {
                 resetIdle();
                 if (isUsbMode) {
-                    usbKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCW);
-                    usbKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCW);
+                    usbKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
+                    usbKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
                 } else {
-                    bleKeyboard.release(rotaryExtRotaryEncoderMap[0].rotaryCW);
-                    bleKeyboard.write(rotaryExtRotaryEncoderMap[0].rotaryCW);
+                    bleKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
+                    bleKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
                 }
                 updateKeyInfo = true;
-                currentKeyInfo = rotaryExtRotaryEncoderMap[0].rotaryCWInfo;
+                currentKeyInfo = onboardRotaryEncoders[0].rotaryCWInfo;
             }
         }
 
@@ -669,20 +648,31 @@ void encoderExtBoardTask(void *pvParameters) {
                 }
                 lastPinAState = pinAState;
                 lastPinBState = pinBState;
+
                 if (trigger) {
                     resetIdle();
                     if (direction.equals("CW")) {
-                        bleKeyboard.write(
-                            rotaryExtRotaryEncoderMap[0].rotaryCW);
+                        if (isUsbMode) {
+                            usbKeyboard.write(
+                                rotaryExtRotaryEncoders[0].rotaryCW);
+                        } else {
+                            bleKeyboard.write(
+                                rotaryExtRotaryEncoders[0].rotaryCW);
+                        }
                         updateKeyInfo = true;
                         currentKeyInfo =
-                            rotaryExtRotaryEncoderMap[0].rotaryCWInfo;
+                            rotaryExtRotaryEncoders[0].rotaryCWInfo;
                     } else if (direction.equals("CCW")) {
-                        bleKeyboard.write(
-                            rotaryExtRotaryEncoderMap[0].rotaryCCW);
+                        if (isUsbMode) {
+                            usbKeyboard.write(
+                                rotaryExtRotaryEncoders[0].rotaryCCW);
+                        } else {
+                            bleKeyboard.write(
+                                rotaryExtRotaryEncoders[0].rotaryCCW);
+                        }
                         updateKeyInfo = true;
                         currentKeyInfo =
-                            rotaryExtRotaryEncoderMap[0].rotaryCCWInfo;
+                            rotaryExtRotaryEncoders[0].rotaryCCWInfo;
                     }
                     trigger = false;
                 }
@@ -699,16 +689,16 @@ void encoderExtBoardTask(void *pvParameters) {
                             // if (millis() - rotaryEncoderLastButtonPress >
                             // 200) {
                             //     bleKeyboard.write(
-                            //         rotaryExtRotaryEncoderMap[0].rotaryButton);
+                            //         rotaryExtRotaryEncoders[0].rotaryButton);
                             //     updateKeyInfo = true;
-                            //     currentKeyInfo = rotaryExtRotaryEncoderMap[0]
+                            //     currentKeyInfo = rotaryExtRotaryEncoders[0]
                             //                          .rotaryButtonInfo;
                             // }
-                            rotaryExtRotaryEncoderMap[0]
+                            rotaryExtRotaryEncoders[0]
                                 .rotaryButtonState = keyPress(
-                                rotaryExtRotaryEncoderMap[0].rotaryButton,
-                                rotaryExtRotaryEncoderMap[0].rotaryButtonInfo,
-                                rotaryExtRotaryEncoderMap[0].rotaryButtonState);
+                                rotaryExtRotaryEncoders[0].rotaryButton,
+                                rotaryExtRotaryEncoders[0].rotaryButtonInfo,
+                                rotaryExtRotaryEncoders[0].rotaryButtonState);
                             break;
                             break;
                         case extensionBtn1:
@@ -734,14 +724,12 @@ void encoderExtBoardTask(void *pvParameters) {
                 } else if (btnState == HIGH) {
                     switch (btnArray[i]) {
                         case encoderSW:
-                            if (rotaryExtRotaryEncoderMap[0]
-                                    .rotaryButtonState) {
-                                rotaryExtRotaryEncoderMap[0]
+                            if (rotaryExtRotaryEncoders[0].rotaryButtonState) {
+                                rotaryExtRotaryEncoders[0]
                                     .rotaryButtonState = keyRelease(
-                                    rotaryExtRotaryEncoderMap[0].rotaryButton,
-                                    rotaryExtRotaryEncoderMap[0]
-                                        .rotaryButtonInfo,
-                                    rotaryExtRotaryEncoderMap[0]
+                                    rotaryExtRotaryEncoders[0].rotaryButton,
+                                    rotaryExtRotaryEncoders[0].rotaryButtonInfo,
+                                    rotaryExtRotaryEncoders[0]
                                         .rotaryButtonState);
                             }
                             break;
@@ -778,23 +766,22 @@ void encoderExtBoardTask(void *pvParameters) {
     }
 }
 
-void i2cScannerTask(void *pvParameters) {
+void i2cTask(void *pvParameters) {
+    byte error;
+    byte devices[1] = {ENCODER_EXTENSION_ADDR};
     while (true) {
-        // byte error;
-        // byte devices[1] = {ENCODER_EXTENSION_ADDR};
-        // for (byte i : devices) {
-        //     Wire.beginTransmission(devices[i]);
-        //     error = Wire.endTransmission();
+        renderScreen();
 
-        //     if (devices[i] == ENCODER_EXTENSION_ADDR) {
-        //         if (error == 0)
-        //             isRotaryExtensionConnected = true;
-        //         else
-        //             isRotaryExtensionConnected = false;
-        //     }
-        // }
+        for (byte i : devices) {
+            Wire.beginTransmission(devices[i]);
+            error = Wire.endTransmission();
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+            if (devices[i] == ENCODER_EXTENSION_ADDR) {
+                isRotaryExtensionConnected = (error == 0);
+            }
+        }
+
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -962,6 +949,36 @@ void initKeys() {
         }
     }
 
+    // Load Onboard Rotary Encoder config from doc["onBoardRotaryEncoder"]
+    uint8_t onboardRotaryEncoderRotaryMap[3];
+    String onboardRotaryEncoderInfo[3];
+    if (doc["onBoardRotaryEncoder"].isNull()) {
+        Serial.println("No onboard rotary encoder config found");
+    } else {
+        copyArray(doc["onBoardRotaryEncoder"][currentLayoutIndex]["rotaryMap"],
+                  onboardRotaryEncoderRotaryMap);
+        copyArray(doc["onBoardRotaryEncoder"][currentLayoutIndex]["rotaryInfo"],
+                  onboardRotaryEncoderInfo);
+
+        // Assign rotary encoder data
+        for (int i = 0; i < sizeof(onboardRotaryEncoders) /
+                                sizeof(onboardRotaryEncoders[0]);
+             i++) {
+            onboardRotaryEncoders[0].rotaryButton =
+                onboardRotaryEncoderRotaryMap[0];
+            onboardRotaryEncoders[0].rotaryButtonInfo =
+                onboardRotaryEncoderInfo[0];
+            onboardRotaryEncoders[0].rotaryButtonState = false;
+            onboardRotaryEncoders[0].rotaryCCW =
+                onboardRotaryEncoderRotaryMap[1];
+            onboardRotaryEncoders[0].rotaryCW =
+                onboardRotaryEncoderRotaryMap[2];
+            onboardRotaryEncoders[0].rotaryCCWInfo =
+                onboardRotaryEncoderInfo[1];
+            onboardRotaryEncoders[0].rotaryCWInfo = onboardRotaryEncoderInfo[2];
+        }
+    }
+
     // Load Rotary Extension config from doc["rotaryExtension"]
     uint8_t rotaryExtKeyLayout[3];
     String rotaryExtKeyInfo[3];
@@ -984,15 +1001,15 @@ void initKeys() {
             rotaryExtKeyMap[i].keyStroke = rotaryExtKeyLayout[i];
             rotaryExtKeyMap[i].keyInfo = rotaryExtKeyInfo[i];
             rotaryExtKeyMap[i].state = false;
-            rotaryExtRotaryEncoderMap[0].rotaryButton = rotaryExtRotaryMap[0];
-            rotaryExtRotaryEncoderMap[0].rotaryButtonInfo =
-                rotaryExtRotaryInfo[0];
-            rotaryExtRotaryEncoderMap[0].rotaryButtonState = false;
-            rotaryExtRotaryEncoderMap[0].rotaryCCW = rotaryExtRotaryMap[1];
-            rotaryExtRotaryEncoderMap[0].rotaryCW = rotaryExtRotaryMap[2];
-            rotaryExtRotaryEncoderMap[0].rotaryCCWInfo = rotaryExtRotaryInfo[1];
-            rotaryExtRotaryEncoderMap[0].rotaryCWInfo = rotaryExtRotaryInfo[2];
         }
+        // Assign rotary encoder data
+        rotaryExtRotaryEncoders[0].rotaryButton = rotaryExtRotaryMap[0];
+        rotaryExtRotaryEncoders[0].rotaryButtonInfo = rotaryExtRotaryInfo[0];
+        rotaryExtRotaryEncoders[0].rotaryButtonState = false;
+        rotaryExtRotaryEncoders[0].rotaryCCW = rotaryExtRotaryMap[1];
+        rotaryExtRotaryEncoders[0].rotaryCW = rotaryExtRotaryMap[2];
+        rotaryExtRotaryEncoders[0].rotaryCCWInfo = rotaryExtRotaryInfo[1];
+        rotaryExtRotaryEncoders[0].rotaryCWInfo = rotaryExtRotaryInfo[2];
     }
 
     // Show layout title on screen

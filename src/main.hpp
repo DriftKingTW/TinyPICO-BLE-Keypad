@@ -13,7 +13,6 @@
 #include "USBHIDKeyboard.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
-// #include <TinyPICO.h>
 #include <U8g2lib.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -85,7 +84,7 @@ struct Key {
     String keyInfo;
 };
 
-struct RotaryEncoder {
+struct RotaryEncoderConfig {
     uint8_t rotaryButton;
     String rotaryButtonInfo;
     bool rotaryButtonState;
@@ -107,10 +106,9 @@ struct Macro {
 void ledTask(void *);
 void generalTask(void *);
 void networkTask(void *);
-void screenTask(void *);
 void ICACHE_RAM_ATTR encoderTask(void *);
 void ICACHE_RAM_ATTR encoderExtBoardTask(void *);
-void i2cScannerTask(void *);
+void i2cTask(void *);
 
 // Keyboard
 void initKeys();
