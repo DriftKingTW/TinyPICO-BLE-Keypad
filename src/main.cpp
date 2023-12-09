@@ -889,16 +889,26 @@ void loop() {
     // Read CFG Buttons
     if (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
         resetIdle();
-        switchBootMode();
+        int longPressCounter = 0;
         while (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
             delay(10);
+            if (longPressCounter > 100) {
+                switchBootMode();
+            }
+            longPressCounter++;
         }
+        isCaffeinated = !isCaffeinated;
     } else if (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
         resetIdle();
-        isUsbMode = !isUsbMode;
+        int longPressCounter = 0;
         while (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
             delay(10);
+            if (longPressCounter > 100) {
+                goSleeping();
+            }
+            longPressCounter++;
         }
+        isUsbMode = !isUsbMode;
     }
 }
 
