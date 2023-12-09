@@ -580,10 +580,10 @@ void encoderTask(void *pvParameters) {
 
             if (direction.equals("CCW")) {
                 resetIdle();
-                if (isUsbMode) {
+                if (isUsbMode && !isOutputLocked) {
                     usbKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
                     usbKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
-                } else {
+                } else if (!isOutputLocked) {
                     bleKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
                     bleKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
                 }
@@ -591,10 +591,10 @@ void encoderTask(void *pvParameters) {
                 currentKeyInfo = onboardRotaryEncoders[0].rotaryCCWInfo;
             } else if (direction.equals("CW")) {
                 resetIdle();
-                if (isUsbMode) {
+                if (isUsbMode && !isOutputLocked) {
                     usbKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
                     usbKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
-                } else {
+                } else if (!isOutputLocked) {
                     bleKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
                     bleKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
                 }
@@ -652,10 +652,10 @@ void encoderExtBoardTask(void *pvParameters) {
                 if (trigger) {
                     resetIdle();
                     if (direction.equals("CW")) {
-                        if (isUsbMode) {
+                        if (isUsbMode && !isOutputLocked) {
                             usbKeyboard.write(
                                 rotaryExtRotaryEncoders[0].rotaryCW);
-                        } else {
+                        } else if (!isOutputLocked) {
                             bleKeyboard.write(
                                 rotaryExtRotaryEncoders[0].rotaryCW);
                         }
@@ -663,10 +663,10 @@ void encoderExtBoardTask(void *pvParameters) {
                         currentKeyInfo =
                             rotaryExtRotaryEncoders[0].rotaryCWInfo;
                     } else if (direction.equals("CCW")) {
-                        if (isUsbMode) {
+                        if (isUsbMode && !isOutputLocked) {
                             usbKeyboard.write(
                                 rotaryExtRotaryEncoders[0].rotaryCCW);
-                        } else {
+                        } else if (!isOutputLocked) {
                             bleKeyboard.write(
                                 rotaryExtRotaryEncoders[0].rotaryCCW);
                         }
