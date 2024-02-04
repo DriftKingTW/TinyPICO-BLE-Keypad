@@ -1051,7 +1051,6 @@ void initKeys() {
     contentBottom = "@" + currentLayout;
 
     EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
-    EEPROM.commit();
     Serial.println("Key layout loaded: " + currentLayout);
 }
 
@@ -1515,6 +1514,7 @@ bool getUSBPowerState() {
  */
 void goSleeping() {
     isGoingToSleep = true;
+    EEPROM.commit();
     delay(1000);
     // Column pins
     rtc_gpio_pulldown_dis(GPIO_NUM_5);
