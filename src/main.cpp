@@ -1101,6 +1101,78 @@ void updateKeymaps() {
 }
 
 /**
+ * Press USB HID keys. (Fix for modifier keys)
+ *
+ * @param {uint8_t} keyStroke the key stroke to be pressed
+ */
+void usbKeyboardPress(uint8_t keyStroke) {
+    switch (keyStroke) {
+        case 128:  // KEY_LEFT_CTRL
+            usbKeyboard.pressRaw(0xe0);
+            break;
+        case 129:  // KEY_LEFT_SHIFT
+            usbKeyboard.pressRaw(0xe1);
+            break;
+        case 130:  // KEY_LEFT_ALT
+            usbKeyboard.pressRaw(0xe2);
+            break;
+        case 131:  // KEY_LEFT_GUI
+            usbKeyboard.pressRaw(0xe3);
+            break;
+        case 132:  // KEY_RIGHT_CTRL
+            usbKeyboard.pressRaw(0xe4);
+            break;
+        case 133:  // KEY_RIGHT_SHIFT
+            usbKeyboard.pressRaw(0xe5);
+            break;
+        case 134:  // KEY_RIGHT_ALT
+            usbKeyboard.pressRaw(0xe6);
+            break;
+        case 135:  // KEY_RIGHT_GUI
+            usbKeyboard.pressRaw(0xe7);
+            break;
+        default:
+            usbKeyboard.press(keyStroke);
+    }
+}
+
+/**
+ * Release USB HID keys. (Fix for modifier keys)
+ *
+ * @param {uint8_t} keyStroke the key stroke to be pressed
+ */
+void usbKeyboardRelease(uint8_t keyStroke) {
+    switch (keyStroke) {
+        case 128:  // KEY_LEFT_CTRL
+            usbKeyboard.releaseRaw(0xe0);
+            break;
+        case 129:  // KEY_LEFT_SHIFT
+            usbKeyboard.releaseRaw(0xe1);
+            break;
+        case 130:  // KEY_LEFT_ALT
+            usbKeyboard.releaseRaw(0xe2);
+            break;
+        case 131:  // KEY_LEFT_GUI
+            usbKeyboard.releaseRaw(0xe3);
+            break;
+        case 132:  // KEY_RIGHT_CTRL
+            usbKeyboard.releaseRaw(0xe4);
+            break;
+        case 133:  // KEY_RIGHT_SHIFT
+            usbKeyboard.releaseRaw(0xe5);
+            break;
+        case 134:  // KEY_RIGHT_ALT
+            usbKeyboard.releaseRaw(0xe6);
+            break;
+        case 135:  // KEY_RIGHT_GUI
+            usbKeyboard.releaseRaw(0xe7);
+            break;
+        default:
+            usbKeyboard.release(keyStroke);
+    }
+}
+
+/**
  * Press key
  *
  * @param {Key} key the key to be pressed
@@ -1111,7 +1183,7 @@ void keyPress(Key &key) {
     }
     if (key.state == false && !isOutputLocked) {
         if (isUsbMode) {
-            usbKeyboard.press(key.keyStroke);
+            usbKeyboardPress(key.keyStroke);
         } else {
             bleKeyboard.press(key.keyStroke);
         }
@@ -1127,7 +1199,7 @@ bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState) {
     }
     if (keyState == false && !isOutputLocked) {
         if (isUsbMode) {
-            usbKeyboard.press(keyStroke);
+            usbKeyboardPress(keyStroke);
         } else {
             bleKeyboard.press(keyStroke);
         }
@@ -1149,7 +1221,7 @@ void keyRelease(Key &key) {
     }
     if (key.state == true && !isOutputLocked) {
         if (isUsbMode) {
-            usbKeyboard.release(key.keyStroke);
+            usbKeyboardRelease(key.keyStroke);
         } else {
             bleKeyboard.release(key.keyStroke);
         }
@@ -1164,7 +1236,7 @@ bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState) {
     }
     if (keyState == true && !isOutputLocked) {
         if (isUsbMode) {
-            usbKeyboard.release(keyStroke);
+            usbKeyboardRelease(keyStroke);
         } else {
             bleKeyboard.release(keyStroke);
         }

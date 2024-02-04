@@ -115,6 +115,8 @@ void i2cTask(void *);
 void initKeys();
 void initMacros();
 void updateKeymaps();
+void usbKeyboardPress(uint8_t keyStroke);
+void usbKeyboardRelease(uint8_t keyStroke);
 void keyPress(Key &key);
 bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState);
 void keyRelease(Key &key);
