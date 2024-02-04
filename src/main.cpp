@@ -190,6 +190,7 @@ void setup() {
 
     Serial.println("Configuring Configuration Buttons...");
 
+    pinMode(CFG_BTN_PIN_0, INPUT_PULLUP);
     pinMode(CFG_BTN_PIN_1, INPUT_PULLUP);
     pinMode(CFG_BTN_PIN_2, INPUT_PULLUP);
 
@@ -494,6 +495,13 @@ void generalTask(void *pvParameters) {
 void ledTask(void *pvParameters) {
     while (true) {
         currentMillis = millis();
+
+        if (isGoingToSleep) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            leds[0] = CRGB::Black;
+            FastLED.show();
+            continue;
+        }
 
         // Low battery LED blink
         if (isLowBattery) {
@@ -909,6 +917,21 @@ void loop() {
             longPressCounter++;
         }
         isUsbMode = !isUsbMode;
+        usbKeyboard.releaseAll();
+        bleKeyboard.releaseAll();
+    } else if (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
+        resetIdle();
+        int longPressCounter = 0;
+        while (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
+            delay(10);
+            if (longPressCounter > 100) {
+                switchBootMode();
+            }
+            longPressCounter++;
+        }
+        isUsbMode = !isUsbMode;
+        usbKeyboard.releaseAll();
+        bleKeyboard.releaseAll();
     }
 }
 
@@ -1380,7 +1403,7 @@ void renderScreen() {
  *
  */
 int getBatteryPercentage() {
-    const float minVoltage = 2.8, fullVolatge = 3.8;
+    const float minVoltage = 3, fullVolatge = 3.8;
 
     int raw = analogRead(6);
     float batteryVoltage = raw * V_REF / 4096.0 * VOLTAGE_DIVIDER_RATIO;
@@ -1465,7 +1488,7 @@ void switchBootMode() {
 void checkIdle() {
     if (!isCaffeinated &&
         currentMillis - sleepPreviousMillis > SLEEP_INTERVAL &&
-        getUSBPowerState()) {
+        !getUSBPowerState()) {
         goSleeping();
     } else if (!isCaffeinated &&
                currentMillis - sleepPreviousMillis > SCREEN_SLEEP_INTERVAL) {

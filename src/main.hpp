@@ -62,6 +62,7 @@ using namespace std;
 #define LED_PIN_DIN 38
 #define NUM_LEDS 1
 
+#define CFG_BTN_PIN_0 0
 #define CFG_BTN_PIN_1 2
 #define CFG_BTN_PIN_2 1
 
