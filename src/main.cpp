@@ -1086,13 +1086,17 @@ void readConfigButtons() {
             }
             delay(10);
             if (longPressCounter > 100) {
-                switchBootMode();
+                isCaffeinated = !isCaffeinated;
+                while (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
+                    delay(10);
+                }
+                return;
             }
             longPressCounter++;
         }
-        isUsbMode = !isUsbMode;
-        usbKeyboard.releaseAll();
-        bleKeyboard.releaseAll();
+        if (!isScreenSleeping) {
+            isScreenDisabled = !isScreenDisabled;
+        }
     } else if (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
         resetIdle();
         while (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
