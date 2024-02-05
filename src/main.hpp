@@ -8,11 +8,6 @@
 #include <ImprovWiFiLibrary.h>
 #include <PCF8574.h>
 #include <SPIFFS.h>
-
-#include "USB.h"
-#include "USBHIDKeyboard.h"
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
 #include <U8g2lib.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -26,6 +21,11 @@
 #include <helper.hpp>
 #include <iterator>
 #include <string>
+
+#include "USB.h"
+#include "USBHIDKeyboard.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
 
 using namespace std;
 
@@ -128,6 +128,7 @@ void switchLayout();
 void switchLayout(int layoutIndex);
 int findLayoutIndex(String layoutName);
 void switchDevice();
+void readConfigButtons();
 
 // OLED Control
 void renderScreen();
@@ -145,6 +146,7 @@ bool getUSBPowerState();
 
 // File Management
 String loadJSONFileAsString(String filename);
+void resetConfigFiles();
 
 // Web Server
 void initWebServer();

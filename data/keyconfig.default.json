@@ -1,0 +1,36 @@
+{
+  "keyConfig": [
+    {
+      "title": "Default",
+      "keymap": [
+        [177, 49, 50, 51, 52, 53, 0],
+        [179, 113, 119, 101, 114, 116, 8],
+        [193, 97, 115, 100, 102, 103, 0],
+        [129, 122, 120, 99, 118, 98, 176],
+        [128, 0, 130, 131, 32, 131, 131]
+      ],
+      "keyInfo": [
+        ["Escape", "1", "2", "3", "4", "5", "NULL"],
+        ["Tab", "Q", "W", "E", "R", "T", "Delete"],
+        ["Caps Lock", "A", "S", "D", "F", "G", "NULL"],
+        ["Shift", "Z", "X", "C", "V", "B", "Enter"],
+        ["Ctrl", "FN", "Option", "Command", "Space", "Command", "Command"]
+      ]
+    }
+  ],
+  "macros": [],
+  "onBoardRotaryEncoder": [
+    {
+      "rotaryMap": [0, 216, 215],
+      "rotaryInfo": ["NULL", "ArrowLeft", "ArrowRight"]
+    }
+  ],
+  "rotaryExtension": [
+    {
+      "keymap": [97, 98, 99],
+      "keyInfo": ["A", "B", "C"],
+      "rotaryMap": [32, 91, 93],
+      "rotaryInfo": ["Space", "BracketLeft", "BracketRight"]
+    }
+  ]
+}

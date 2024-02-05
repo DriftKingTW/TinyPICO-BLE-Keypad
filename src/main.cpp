@@ -894,45 +894,7 @@ void loop() {
         }
     }
 
-    // Read CFG Buttons
-    if (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
-        resetIdle();
-        int longPressCounter = 0;
-        while (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
-            delay(10);
-            if (longPressCounter > 100) {
-                goSleeping();
-            }
-            longPressCounter++;
-        }
-        isOutputLocked = !isOutputLocked;
-    } else if (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
-        resetIdle();
-        int longPressCounter = 0;
-        while (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
-            delay(10);
-            if (longPressCounter > 100) {
-                switchBootMode();
-            }
-            longPressCounter++;
-        }
-        isUsbMode = !isUsbMode;
-        usbKeyboard.releaseAll();
-        bleKeyboard.releaseAll();
-    } else if (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
-        resetIdle();
-        int longPressCounter = 0;
-        while (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
-            delay(10);
-            if (longPressCounter > 100) {
-                switchBootMode();
-            }
-            longPressCounter++;
-        }
-        isUsbMode = !isUsbMode;
-        usbKeyboard.releaseAll();
-        bleKeyboard.releaseAll();
-    }
+    readConfigButtons();
 }
 
 /**
@@ -1097,6 +1059,97 @@ void updateKeymaps() {
 
     keymapsNeedsUpdate = false;
     configUpdated = true;
+}
+
+void readConfigButtons() {
+    int longPressCounter = 0;
+    if (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
+        resetIdle();
+        while (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
+            if (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
+                resetConfigFiles();
+                return;
+            }
+            delay(10);
+            if (longPressCounter > 100) {
+                goSleeping();
+            }
+            longPressCounter++;
+        }
+        isOutputLocked = !isOutputLocked;
+    } else if (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
+        resetIdle();
+        while (digitalRead(CFG_BTN_PIN_2) == ACTIVE) {
+            if (digitalRead(CFG_BTN_PIN_1) == ACTIVE) {
+                resetConfigFiles();
+                return;
+            }
+            delay(10);
+            if (longPressCounter > 100) {
+                switchBootMode();
+            }
+            longPressCounter++;
+        }
+        isUsbMode = !isUsbMode;
+        usbKeyboard.releaseAll();
+        bleKeyboard.releaseAll();
+    } else if (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
+        resetIdle();
+        while (digitalRead(CFG_BTN_PIN_0) == ACTIVE) {
+            delay(10);
+            if (longPressCounter > 100) {
+                switchBootMode();
+            }
+            longPressCounter++;
+        }
+        isUsbMode = !isUsbMode;
+        usbKeyboard.releaseAll();
+        bleKeyboard.releaseAll();
+    }
+}
+
+void resetConfigFiles() {
+    byte countDown = 3;
+    resetIdle();
+    for (byte countDown = 3; 0 < countDown; countDown--) {
+        updateKeyInfo = true;
+        currentKeyInfo = "Reset config in " + (String)countDown;
+
+        if (digitalRead(CFG_BTN_PIN_1) != ACTIVE ||
+            digitalRead(CFG_BTN_PIN_2) != ACTIVE) {
+            updateKeyInfo = true;
+            currentKeyInfo = "Reset canceled";
+            delay(1000);
+            return;
+        }
+        delay(1000);
+    }
+    updateKeyInfo = true;
+    currentKeyInfo = "Resetting config...";
+    delay(500);
+    if (SPIFFS.begin()) {
+        File configFile = SPIFFS.open("/config.default.json", "r");
+        File keyConfigFile = SPIFFS.open("/keyconfig.default.json", "r");
+        File configFileWrite = SPIFFS.open("/config.json", "w");
+        File keyConfigFileWrite = SPIFFS.open("/keyconfig.json", "w");
+        if (configFile && configFileWrite) {
+            while (configFile.available()) {
+                configFileWrite.write(configFile.read());
+            }
+            configFile.close();
+            configFileWrite.close();
+        }
+        if (keyConfigFile && keyConfigFileWrite) {
+            while (keyConfigFile.available()) {
+                keyConfigFileWrite.write(keyConfigFile.read());
+            }
+            keyConfigFile.close();
+            keyConfigFileWrite.close();
+        }
+        currentLayoutIndex = 0;
+        keymapsNeedsUpdate = true;
+    }
+    return;
 }
 
 /**
