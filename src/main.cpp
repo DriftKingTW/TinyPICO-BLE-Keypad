@@ -1113,9 +1113,8 @@ void readConfigButtons() {
 }
 
 void resetConfigFiles() {
-    byte countDown = 3;
     resetIdle();
-    for (byte countDown = 3; 0 < countDown; countDown--) {
+    for (byte countDown = 5; 0 < countDown; countDown--) {
         updateKeyInfo = true;
         currentKeyInfo = "Reset config in " + (String)countDown;
 
