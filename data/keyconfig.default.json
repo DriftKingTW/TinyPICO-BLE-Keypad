@@ -61,6 +61,18 @@
       "name": "Actions Menu",
       "keyStrokes": [131, 107],
       "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Perspective Guide",
+      "keyStrokes": [131, 59],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Copy All Layers",
+      "keyStrokes": [131, 97],
+      "stringContent": ""
     }
   ],
   "onBoardRotaryEncoder": [
