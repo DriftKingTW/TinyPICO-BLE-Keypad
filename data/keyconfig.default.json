@@ -43,7 +43,26 @@
       ]
     }
   ],
-  "macros": [],
+  "macros": [
+    {
+      "type": 0,
+      "name": "Task Manager",
+      "keyStrokes": [128, 130, 212],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Toggle Fullscreen",
+      "keyStrokes": [131, 48],
+      "stringContent": ""
+    },
+    {
+      "type": 0,
+      "name": "Actions Menu",
+      "keyStrokes": [131, 107],
+      "stringContent": ""
+    }
+  ],
   "onBoardRotaryEncoder": [
     {
       "rotaryMap": [131, 216, 215],
