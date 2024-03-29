@@ -376,13 +376,16 @@ void generalTask(void *pvParameters) {
         // }
 
         // Update screen info
+        String result = "";
         if (isGoingToSleep) {
             contentBottom = "Going to sleep";
             contentIcon = 7;
         } else if (isOutputLocked) {
             contentIcon = 10;
+            result = "Bat. " + (String)batteryPercentage + "%";
         } else if (isCaffeinated) {
             contentIcon = 9;
+            result = "Bat. " + (String)batteryPercentage + "%";
         } else if (bootWiFiMode) {
             String networkInfo = "";
             if (currentMillis - networkInfoPreviousMillis <
@@ -406,7 +409,6 @@ void generalTask(void *pvParameters) {
             }
             contentTop = networkInfo;
         } else {
-            String result = "";
             bool plugged = getUSBPowerState();
             if (!plugged) {
                 isUsbMode = false;
