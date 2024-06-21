@@ -383,9 +383,11 @@ void generalTask(void *pvParameters) {
         } else if (isOutputLocked) {
             contentIcon = 10;
             result = "Bat. " + (String)batteryPercentage + "%";
+            contentTop = result;
         } else if (isCaffeinated) {
             contentIcon = 9;
             result = "Bat. " + (String)batteryPercentage + "%";
+            contentTop = result;
         } else if (bootWiFiMode) {
             String networkInfo = "";
             if (currentMillis - networkInfoPreviousMillis <
