@@ -624,26 +624,88 @@ void encoderTask(void *pvParameters) {
 
             if (direction.equals("CCW")) {
                 resetIdle();
+                // USB mode
                 if (isUsbMode && !isOutputLocked) {
-                    usbKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
-                    usbKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
+                    if (onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
+                            "MACRO_")) {
+                        size_t index =
+                            onboardRotaryEncoders[0]
+                                .rotaryCCWInfo
+                                .substring(6, sizeof(onboardRotaryEncoders[0]
+                                                         .rotaryCCWInfo) -
+                                                  1)
+                                .toInt();
+                        macroPress(macroMap[index]);
+                    } else {
+                        usbKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
+                        usbKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
+                    }
+                    // BLE mode
                 } else if (!isOutputLocked) {
-                    bleKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
-                    bleKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
+                    if (onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
+                            "MACRO_")) {
+                        size_t index =
+                            onboardRotaryEncoders[0]
+                                .rotaryCCWInfo
+                                .substring(6, sizeof(onboardRotaryEncoders[0]
+                                                         .rotaryCCWInfo) -
+                                                  1)
+                                .toInt();
+                        macroPress(macroMap[index]);
+                    } else {
+                        bleKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
+                        bleKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
+                    }
                 }
-                updateKeyInfo = true;
-                currentKeyInfo = onboardRotaryEncoders[0].rotaryCCWInfo;
+                if (!onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
+                        "MACRO_")) {
+                    updateKeyInfo = true;
+                    currentKeyInfo = onboardRotaryEncoders[0].rotaryCCWInfo;
+                }
             } else if (direction.equals("CW")) {
                 resetIdle();
+                // USB mode
                 if (isUsbMode && !isOutputLocked) {
-                    usbKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
-                    usbKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
+                    if (onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
+                            "MACRO_")) {
+                        size_t index =
+                            onboardRotaryEncoders[0]
+                                .rotaryCWInfo
+                                .substring(
+                                    6,
+                                    sizeof(
+                                        onboardRotaryEncoders[0].rotaryCWInfo) -
+                                        1)
+                                .toInt();
+                        macroPress(macroMap[index]);
+                    } else {
+                        usbKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
+                        usbKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
+                    }
+                    // BLE mode
                 } else if (!isOutputLocked) {
-                    bleKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
-                    bleKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
+                    if (onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
+                            "MACRO_")) {
+                        size_t index =
+                            onboardRotaryEncoders[0]
+                                .rotaryCWInfo
+                                .substring(
+                                    6,
+                                    sizeof(
+                                        onboardRotaryEncoders[0].rotaryCWInfo) -
+                                        1)
+                                .toInt();
+                        macroPress(macroMap[index]);
+                    } else {
+                        bleKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
+                        bleKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
+                    }
                 }
-                updateKeyInfo = true;
-                currentKeyInfo = onboardRotaryEncoders[0].rotaryCWInfo;
+                if (!onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
+                        "MACRO_")) {
+                    updateKeyInfo = true;
+                    currentKeyInfo = onboardRotaryEncoders[0].rotaryCWInfo;
+                }
             }
         }
 
