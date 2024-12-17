@@ -349,40 +349,7 @@ void generalTask(void *pvParameters) {
 
     while (true) {
         checkBattery();
-
-        // Accept Serial input for keyconfig.json
-        if (Serial.available() > 0) {
-            String jsonString = Serial.readString();
-            Serial.println("Received JSON:");
-            Serial.println(jsonString);
-
-            // Parse JSON
-            DynamicJsonDocument doc(jsonDocSize);
-            deserializeJson(doc, jsonString);
-
-            // Check if JSON overflowed
-            if (doc.overflowed() || doc.isNull()) {
-                Serial.println("JSON overflowed or empty");
-            } else {
-                // Save JSON to SPIFFS as keyconfig.json
-                File configFile = SPIFFS.open("/keyconfig.json", "w");
-                if (!configFile) {
-                    Serial.println("Failed to open config file for writing");
-                }
-                if (!serializeJson(doc, configFile)) {
-                    Serial.println("Failed to write to config file");
-                }
-                configFile.close();
-
-                // Reload keymaps
-                keymapsNeedsUpdate = true;
-
-                // Show config updated message
-                configUpdated = true;
-                Serial.println("Config updated!");
-            }
-        }
-
+        
         // if (isDetectingLastConnectedDevice && bleKeyboard.isConnected() &&
         //     bleKeyboard.getCounnectedCount() > 1) {
         // isDetectingLastConnectedDevice = false;
@@ -903,6 +870,39 @@ void loop() {
 
     if (isGoingToSleep) {
         return;
+    }
+
+    // Accept Serial input for keyconfig.json
+    if (Serial.available() > 0) {
+        String jsonString = Serial.readString();
+        Serial.println("Received JSON:");
+        Serial.println(jsonString);
+
+        // Parse JSON
+        DynamicJsonDocument doc(jsonDocSize);
+        deserializeJson(doc, jsonString);
+
+        // Check if JSON overflowed
+        if (doc.overflowed() || doc.isNull()) {
+            Serial.println("JSON overflowed or empty");
+        } else {
+            // Save JSON to SPIFFS as keyconfig.json
+            File configFile = SPIFFS.open("/keyconfig.json", "w");
+            if (!configFile) {
+                Serial.println("Failed to open config file for writing");
+            }
+            if (!serializeJson(doc, configFile)) {
+                Serial.println("Failed to write to config file");
+            }
+            configFile.close();
+
+            // Reload keymaps
+            keymapsNeedsUpdate = true;
+
+            // Show config updated message
+            configUpdated = true;
+            Serial.println("Config updated!");
+        }
     }
 
     // Keypad scan
