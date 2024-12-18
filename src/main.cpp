@@ -173,7 +173,8 @@ void setup() {
 
     Serial.println("Starting improv serial work...");
     improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32,
-                               "Schnell Firmware", "1.0.1", "Schnell Keypad");
+                               "Schnell Firmware", "1.1.0-beta.1",
+                               "Schnell Keypad");
     improvSerial.onImprovError(onImprovWiFiErrorCb);
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
 
