@@ -5,7 +5,6 @@ RTC_DATA_ATTR bool bootWiFiMode = false;
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
-USBHIDKeyboard usbKeyboard;
 
 PCF8574 pcf8574RotaryExtension(ENCODER_EXTENSION_ADDR);
 bool isRotaryExtensionConnected = false;
@@ -163,8 +162,7 @@ void setup() {
     Serial.println("Starting BLE work...");
     bleKeyboard.begin();
     // bleKeyboard.set_current_active_device(currentActiveDevice);
-    usbKeyboard.begin();
-    USB.begin();
+    UsbHid::begin();
 
     Serial.println("Starting u8g2...");
     u8g2.begin();
@@ -173,7 +171,7 @@ void setup() {
 
     Serial.println("Starting improv serial work...");
     improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32,
-                               "Schnell Firmware", "1.1.0-beta.1",
+                               "Schnell Firmware", FIRMWARE_VERSION,
                                "Schnell Keypad");
     improvSerial.onImprovError(onImprovWiFiErrorCb);
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
@@ -605,8 +603,8 @@ void encoderTask(void *pvParameters) {
                                 .toInt();
                         macroPress(macroMap[index]);
                     } else {
-                        usbKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
-                        usbKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
+                        UsbHid::release(onboardRotaryEncoders[0].rotaryCCW);
+                        UsbHid::write(onboardRotaryEncoders[0].rotaryCCW);
                     }
                     // BLE mode
                 } else if (!isOutputLocked) {
@@ -647,8 +645,8 @@ void encoderTask(void *pvParameters) {
                                 .toInt();
                         macroPress(macroMap[index]);
                     } else {
-                        usbKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
-                        usbKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
+                        UsbHid::release(onboardRotaryEncoders[0].rotaryCW);
+                        UsbHid::write(onboardRotaryEncoders[0].rotaryCW);
                     }
                     // BLE mode
                 } else if (!isOutputLocked) {
@@ -727,7 +725,7 @@ void encoderExtBoardTask(void *pvParameters) {
                     resetIdle();
                     if (direction.equals("CW")) {
                         if (isUsbMode && !isOutputLocked) {
-                            usbKeyboard.write(
+                            UsbHid::write(
                                 rotaryExtRotaryEncoders[0].rotaryCW);
                         } else if (!isOutputLocked) {
                             bleKeyboard.write(
@@ -738,7 +736,7 @@ void encoderExtBoardTask(void *pvParameters) {
                             rotaryExtRotaryEncoders[0].rotaryCWInfo;
                     } else if (direction.equals("CCW")) {
                         if (isUsbMode && !isOutputLocked) {
-                            usbKeyboard.write(
+                            UsbHid::write(
                                 rotaryExtRotaryEncoders[0].rotaryCCW);
                         } else if (!isOutputLocked) {
                             bleKeyboard.write(
@@ -919,7 +917,7 @@ void loop() {
                         switchBootMode();
                     } else if (r == 3 && c == 0) {
                         isUsbMode = !isUsbMode;
-                        usbKeyboard.releaseAll();
+                        UsbHid::releaseAll();
                         bleKeyboard.releaseAll();
                         delay(300);
                     } else if (r == 4 && c == 4) {
@@ -1206,7 +1204,7 @@ void readConfigButtons() {
             longPressCounter++;
         }
         isUsbMode = !isUsbMode;
-        usbKeyboard.releaseAll();
+        UsbHid::releaseAll();
         bleKeyboard.releaseAll();
     }
 }
@@ -1262,31 +1260,31 @@ void resetConfigFiles() {
 void usbKeyboardPress(uint8_t keyStroke) {
     switch (keyStroke) {
         case 128:  // KEY_LEFT_CTRL
-            usbKeyboard.pressRaw(0xe0);
+            UsbHid::pressRaw(0xe0);
             break;
         case 129:  // KEY_LEFT_SHIFT
-            usbKeyboard.pressRaw(0xe1);
+            UsbHid::pressRaw(0xe1);
             break;
         case 130:  // KEY_LEFT_ALT
-            usbKeyboard.pressRaw(0xe2);
+            UsbHid::pressRaw(0xe2);
             break;
         case 131:  // KEY_LEFT_GUI
-            usbKeyboard.pressRaw(0xe3);
+            UsbHid::pressRaw(0xe3);
             break;
         case 132:  // KEY_RIGHT_CTRL
-            usbKeyboard.pressRaw(0xe4);
+            UsbHid::pressRaw(0xe4);
             break;
         case 133:  // KEY_RIGHT_SHIFT
-            usbKeyboard.pressRaw(0xe5);
+            UsbHid::pressRaw(0xe5);
             break;
         case 134:  // KEY_RIGHT_ALT
-            usbKeyboard.pressRaw(0xe6);
+            UsbHid::pressRaw(0xe6);
             break;
         case 135:  // KEY_RIGHT_GUI
-            usbKeyboard.pressRaw(0xe7);
+            UsbHid::pressRaw(0xe7);
             break;
         default:
-            usbKeyboard.press(keyStroke);
+            UsbHid::press(keyStroke);
     }
 }
 
@@ -1298,31 +1296,31 @@ void usbKeyboardPress(uint8_t keyStroke) {
 void usbKeyboardRelease(uint8_t keyStroke) {
     switch (keyStroke) {
         case 128:  // KEY_LEFT_CTRL
-            usbKeyboard.releaseRaw(0xe0);
+            UsbHid::releaseRaw(0xe0);
             break;
         case 129:  // KEY_LEFT_SHIFT
-            usbKeyboard.releaseRaw(0xe1);
+            UsbHid::releaseRaw(0xe1);
             break;
         case 130:  // KEY_LEFT_ALT
-            usbKeyboard.releaseRaw(0xe2);
+            UsbHid::releaseRaw(0xe2);
             break;
         case 131:  // KEY_LEFT_GUI
-            usbKeyboard.releaseRaw(0xe3);
+            UsbHid::releaseRaw(0xe3);
             break;
         case 132:  // KEY_RIGHT_CTRL
-            usbKeyboard.releaseRaw(0xe4);
+            UsbHid::releaseRaw(0xe4);
             break;
         case 133:  // KEY_RIGHT_SHIFT
-            usbKeyboard.releaseRaw(0xe5);
+            UsbHid::releaseRaw(0xe5);
             break;
         case 134:  // KEY_RIGHT_ALT
-            usbKeyboard.releaseRaw(0xe6);
+            UsbHid::releaseRaw(0xe6);
             break;
         case 135:  // KEY_RIGHT_GUI
-            usbKeyboard.releaseRaw(0xe7);
+            UsbHid::releaseRaw(0xe7);
             break;
         default:
-            usbKeyboard.release(keyStroke);
+            UsbHid::release(keyStroke);
     }
 }
 
@@ -1414,7 +1412,7 @@ void macroPress(Macro &macro) {
         size_t length = sizeof(macro.keyStrokes);
         for (size_t i = 0; i < length; i++) {
             if (isUsbMode) {
-                usbKeyboard.press(macro.keyStrokes[i]);
+                UsbHid::press(macro.keyStrokes[i]);
             } else {
                 bleKeyboard.press(macro.keyStrokes[i]);
             }
@@ -1422,19 +1420,19 @@ void macroPress(Macro &macro) {
         }
         delay(50);
         if (isUsbMode) {
-            usbKeyboard.releaseAll();
+            UsbHid::releaseAll();
         } else {
             bleKeyboard.releaseAll();
         }
     } else if (macro.type == 1) {
         if (isUsbMode) {
-            usbKeyboard.print(macro.stringContent);
+            UsbHid::print(macro.stringContent);
         } else {
             bleKeyboard.print(macro.stringContent);
         }
     } else if (macro.type == 2) {
         if (isUsbMode) {
-            usbKeyboard.println(macro.stringContent);
+            UsbHid::println(macro.stringContent);
         } else {
             bleKeyboard.println(macro.stringContent);
         }
