@@ -26,6 +26,7 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "keyboard_output.h"
+#include "web_server.h"
 
 using namespace std;
 
@@ -107,7 +108,6 @@ struct Macro {
 // Tasks
 void ledTask(void *);
 void generalTask(void *);
-void networkTask(void *);
 void ICACHE_RAM_ATTR encoderTask(void *);
 void ICACHE_RAM_ATTR encoderExtBoardTask(void *);
 void i2cTask(void *);
@@ -146,11 +146,3 @@ bool getUSBPowerState();
 // File Management
 String loadJSONFileAsString(String filename);
 void resetConfigFiles();
-
-// Web Server
-void initWebServer();
-void handleRoot();
-void handleNotFound();
-void sendCrossOriginHeader();
-bool handleFileRead(String);
-String getContentType(String);
