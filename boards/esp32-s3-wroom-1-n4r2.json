@@ -34,7 +34,7 @@
     "maximum_size": 4194304,
     "require_upload_port": true,
     "before_reset": "usb_reset",
-    "after_reset": "no_reset",
+    "after_reset": "hard_reset",
     "speed": 460800
   },
   "url": "",
