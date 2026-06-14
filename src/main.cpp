@@ -48,8 +48,6 @@ ESP32Encoder onboardEncoders[1] = {ESP32Encoder()};
 RotaryEncoderConfig onboardRotaryEncoders[1] = {RotaryEncoderConfig()};
 
 ConfigStore configStore;
-String currentKeyInfo = "";
-bool updateKeyInfo = false;
 bool isFnKeyPressed = false;
 bool isDetectingLastConnectedDevice = true;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
@@ -114,13 +112,10 @@ bool isScreenInverted = false;
 bool isScreenDisabled = false;
 bool isScreenSleeping = false;
 
-// OLED Screen Content
-String contentTop = "";
-String contentBottom = "";
+// OLED screen content lives in the Display module (display_state.h). Icon codes:
 // loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5,
 // low battery: 6, sleep: 7, config: 8, caffeinated: 9, locked: 10,
 // usb connected: 11
-int contentIcon = 0;
 
 // Set web server port number to 80
 WebServer server(80);
@@ -153,6 +148,9 @@ void setup() {
     Serial.begin(BAUD_RATE);
 
     delay(10);
+
+    // Guard the shared screen state before any task can touch it.
+    Display::begin();
 
     printSpacer();
 
@@ -388,38 +386,38 @@ void generalTask(void *pvParameters) {
         // Update screen info
         String result = "";
         if (isGoingToSleep) {
-            contentBottom = "Going to sleep";
-            contentIcon = 7;
+            Display::setBottom("Going to sleep");
+            Display::setIcon(7);
         } else if (isOutputLocked) {
-            contentIcon = 10;
+            Display::setIcon(10);
             result = "Bat. " + (String)batteryPercentage + "%";
-            contentTop = result;
+            Display::setTop(result);
         } else if (isCaffeinated) {
-            contentIcon = 9;
+            Display::setIcon(9);
             result = "Bat. " + (String)batteryPercentage + "%";
-            contentTop = result;
+            Display::setTop(result);
         } else if (bootWiFiMode) {
             String networkInfo = "";
             if (currentMillis - networkInfoPreviousMillis <
                 NETWORK_INFO_INTERVAL) {
                 networkInfo = (String)WiFi.localIP().toString().c_str();
-                contentIcon = 2;
+                Display::setIcon(2);
             } else if ((currentMillis - networkInfoPreviousMillis) <
                        (NETWORK_INFO_INTERVAL * 2)) {
                 networkInfo = (String)MDNS_NAME + ".local";
-                contentIcon = 2;
+                Display::setIcon(2);
             } else {
                 networkInfo = (String)MDNS_NAME + ".local";
                 networkInfoPreviousMillis = currentMillis;
-                contentIcon = 2;
+                Display::setIcon(2);
             }
             if (isSoftAPEnabled) {
-                contentIcon = 3;
+                Display::setIcon(3);
             } else if (WiFi.localIP().toString() == "0.0.0.0") {
                 networkInfo = "Connecting to...";
-                contentIcon = 2;
+                Display::setIcon(2);
             }
-            contentTop = networkInfo;
+            Display::setTop(networkInfo);
         } else {
             bool plugged = getUSBPowerState();
             if (!plugged) {
@@ -429,49 +427,49 @@ void generalTask(void *pvParameters) {
             bool charging = false;
             if (plugged && charging) {
                 result = "Charging";
-                contentIcon = 4;
+                Display::setIcon(4);
             } else if (plugged) {
                 if (isUsbMode) {
                     result = "Plugged in [USB]";
-                    contentIcon = 11;
+                    Display::setIcon(11);
                 } else {
                     result = "Plugged in [BT]";
-                    contentIcon = 5;
+                    Display::setIcon(5);
                 }
-                contentIcon = 5;
+                Display::setIcon(5);
             } else if (batteryPercentage > 100) {
                 result = "Reading battery...";
             } else {
                 result = "Bat. " + (String)batteryPercentage + "%";
                 if (isUsbMode) {
-                    contentIcon = 11;
+                    Display::setIcon(11);
                 } else {
-                    contentIcon = 1;
+                    Display::setIcon(1);
                 }
             }
 
-            contentTop = result;
+            Display::setTop(result);
         }
 
         if (isSwitchingBootMode) {
             if (!bootWiFiMode) {
-                contentIcon = 8;
-                contentBottom = "> WiFi Mode <  ";
+                Display::setIcon(8);
+                Display::setBottom("> WiFi Mode <  ");
             } else {
-                contentBottom = "> Standard Mode <";
+                Display::setBottom("> Standard Mode <");
             }
         }
 
         // Show connecting message when BLE is disconnected
         while (!isUsbMode && !BleHid::isConnected()) {
-            contentBottom = "Connecting BLE..";
+            Display::setBottom("Connecting BLE..");
             checkIdle();
             delay(100);
         }
 
         // Show config updated message after keyconfig updated
         if (configUpdated) {
-            contentBottom = "Config Updated!";
+            Display::setBottom("Config Updated!");
             configUpdated = false;
             delay(1000);
         }
@@ -479,14 +477,14 @@ void generalTask(void *pvParameters) {
         checkIdle();
 
         // Show current pressed key info
-        if (updateKeyInfo) {
-            contentBottom = currentKeyInfo;
-            updateKeyInfo = false;
+        String keyInfo;
+        if (Display::takeKeyInfo(keyInfo)) {
+            Display::setBottom(keyInfo);
         }
 
         // Idle message
         if (currentMillis - sleepPreviousMillis > 5000) {
-            contentBottom = "@" + currentLayout;
+            Display::setBottom("@" + currentLayout);
         }
 
         // Record boot time every 5 seconds
@@ -660,16 +658,14 @@ void encoderExtBoardTask(void *pvParameters) {
                         if (!isOutputLocked) {
                             kbd().write(rotaryExtRotaryEncoders[0].rotaryCW);
                         }
-                        updateKeyInfo = true;
-                        currentKeyInfo =
-                            rotaryExtRotaryEncoders[0].rotaryCWInfo;
+                        Display::setKeyInfo(
+                            rotaryExtRotaryEncoders[0].rotaryCWInfo);
                     } else if (direction.equals("CCW")) {
                         if (!isOutputLocked) {
                             kbd().write(rotaryExtRotaryEncoders[0].rotaryCCW);
                         }
-                        updateKeyInfo = true;
-                        currentKeyInfo =
-                            rotaryExtRotaryEncoders[0].rotaryCCWInfo;
+                        Display::setKeyInfo(
+                            rotaryExtRotaryEncoders[0].rotaryCCWInfo);
                     }
                     trigger = false;
                 }
@@ -983,7 +979,7 @@ void initKeys() {
     // Show layout title on screen
     String str = doc["keyConfig"][currentLayoutIndex]["title"];
     currentLayout = str;
-    contentBottom = "@" + currentLayout;
+    Display::setBottom("@" + currentLayout);
 
     EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
     Serial.println("Key layout loaded: " + currentLayout);
@@ -1080,20 +1076,17 @@ void readConfigButtons() {
 void resetConfigFiles() {
     resetIdle();
     for (byte countDown = 5; 0 < countDown; countDown--) {
-        updateKeyInfo = true;
-        currentKeyInfo = "Reset config in " + (String)countDown;
+        Display::setKeyInfo("Reset config in " + (String)countDown);
 
         if (digitalRead(CFG_BTN_PIN_1) != ACTIVE ||
             digitalRead(CFG_BTN_PIN_2) != ACTIVE) {
-            updateKeyInfo = true;
-            currentKeyInfo = "Reset canceled";
+            Display::setKeyInfo("Reset canceled");
             delay(1000);
             return;
         }
         delay(1000);
     }
-    updateKeyInfo = true;
-    currentKeyInfo = "Resetting config...";
+    Display::setKeyInfo("Resetting config...");
     delay(500);
     if (SPIFFS.begin()) {
         File configFile = SPIFFS.open("/config.default.json", "r");
@@ -1133,8 +1126,7 @@ void keyPress(Key &key) {
         kbd().press(key.keyStroke);
     }
     key.state = true;
-    updateKeyInfo = true;
-    currentKeyInfo = key.keyInfo;
+    Display::setKeyInfo(key.keyInfo);
 }
 
 /**
@@ -1162,8 +1154,7 @@ void keyRelease(Key &key) {
  * type 2: for string content w/ enter key
  */
 void macroPress(Macro &macro) {
-    updateKeyInfo = true;
-    currentKeyInfo = macro.macroInfo;
+    Display::setKeyInfo(macro.macroInfo);
     // Respect output lock (matches keyPress: still show the info, emit nothing)
     if (isOutputLocked) {
         return;
@@ -1212,8 +1203,7 @@ void emitEncoderTurn(uint8_t keyStroke, const String &info) {
         }
     }
     if (!isMacro) {
-        updateKeyInfo = true;
-        currentKeyInfo = info;
+        Display::setKeyInfo(info);
     }
 }
 
@@ -1320,6 +1310,10 @@ void setCPUFrequency(int freq) {
  * @param {char} array to print on oled screen
  */
 void renderScreen() {
+    String contentTop, contentBottom;
+    int contentIcon;
+    Display::snapshot(contentTop, contentBottom, contentIcon);
+
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
@@ -1547,7 +1541,7 @@ void initWebServer() {
     const char *password = doc["password"];
 
     // Connect to Wi-Fi network with SSID and password
-    contentBottom = (String)ssid;
+    Display::setBottom((String)ssid);
     Serial.print("Connecting to ");
     Serial.println(ssid);
     WiFi.mode(WIFI_AP_STA);
