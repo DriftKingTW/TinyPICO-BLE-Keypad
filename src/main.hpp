@@ -21,6 +21,7 @@
 #include <iterator>
 #include <string>
 
+#include "config_store.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "keyboard_output.h"

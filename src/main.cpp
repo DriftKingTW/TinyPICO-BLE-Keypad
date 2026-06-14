@@ -47,7 +47,7 @@ RotaryEncoderConfig rotaryExtRotaryEncoders[1] = {RotaryEncoderConfig()};
 ESP32Encoder onboardEncoders[1] = {ESP32Encoder()};
 RotaryEncoderConfig onboardRotaryEncoders[1] = {RotaryEncoderConfig()};
 
-String keyConfigJSON = "", macroMapJSON = "";
+ConfigStore configStore;
 String currentKeyInfo = "";
 bool updateKeyInfo = false;
 bool isFnKeyPressed = false;
@@ -259,7 +259,7 @@ void setup() {
     Serial.println(listFiles());
 
     Serial.println("Loading config files from SPIFFS...");
-    keyConfigJSON = loadJSONFileAsString("keyconfig");
+    configStore.reload();
 
     StaticJsonDocument<256> doc;
     String configJSON = loadJSONFileAsString("system");
@@ -883,13 +883,7 @@ void loop() {
 void initKeys() {
     Serial.println("Reading JSON keymap configuration...");
 
-    DynamicJsonDocument doc(jsonDocSize);
-    DeserializationError err = deserializeJson(
-        doc, keyConfigJSON, DeserializationOption::NestingLimit(5));
-    if (err) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(err.c_str());
-    }
+    JsonDocument &doc = configStore.doc();
 
     uint8_t keyLayout[ROWS][COLS];
     String keyInfo[ROWS][COLS];
@@ -1000,13 +994,7 @@ void initKeys() {
  *
  */
 void initMacros() {
-    DynamicJsonDocument doc(jsonDocSize);
-    DeserializationError err = deserializeJson(
-        doc, keyConfigJSON, DeserializationOption::NestingLimit(5));
-    if (err) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(err.c_str());
-    }
+    JsonDocument &doc = configStore.doc();
     size_t macrosLength = doc["macros"].size();
     for (size_t i = 0; i < macrosLength; i++) {
         uint8_t macroLayout[] = {0, 0, 0, 0, 0, 0};
@@ -1028,10 +1016,8 @@ void initMacros() {
 void updateKeymaps() {
     resetIdle();
 
-    keyConfigJSON = "";
-
     Serial.println("Loading config files from SPIFFS...");
-    keyConfigJSON = loadJSONFileAsString("keyconfig");
+    configStore.reload();
 
     initKeys();
     initMacros();
@@ -1288,16 +1274,10 @@ void switchLayout(int layoutIndex) {
 
 // input layout name as string and find the index of that layout
 int findLayoutIndex(String layoutName) {
-    DynamicJsonDocument doc(jsonDocSize);
-    DeserializationError err = deserializeJson(
-        doc, keyConfigJSON, DeserializationOption::NestingLimit(5));
-    if (err) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(err.c_str());
-    }
-    size_t layoutLength = doc.size();
-    for (size_t i = 0; i < layoutLength; i++) {
-        String str = doc[i]["title"];
+    JsonDocument &doc = configStore.doc();
+    JsonArrayConst layouts = doc["keyConfig"].as<JsonArrayConst>();
+    for (size_t i = 0; i < layouts.size(); i++) {
+        String str = layouts[i]["title"];
         if (str.equalsIgnoreCase(layoutName)) {
             return i;
         }
