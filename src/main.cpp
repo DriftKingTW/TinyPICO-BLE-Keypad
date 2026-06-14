@@ -4,7 +4,9 @@ RTC_DATA_ATTR unsigned int timeSinceBoot = 0;
 RTC_DATA_ATTR bool bootWiFiMode = false;
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
-BleKeyboard bleKeyboard(BLE_NAME, AUTHOR);
+
+UsbKeyboardOutput usbOutput;
+BleKeyboardOutput bleOutput;
 
 PCF8574 pcf8574RotaryExtension(ENCODER_EXTENSION_ADDR);
 bool isRotaryExtensionConnected = false;
@@ -54,6 +56,14 @@ RTC_DATA_ATTR byte currentLayoutIndex = 0;
 RTC_DATA_ATTR byte currentActiveDevice = 0;
 RTC_DATA_ATTR String currentActiveDeviceAddress = "";
 RTC_DATA_ATTR bool isUsbMode = true;
+
+// Active keyboard output for the current mode. Routes key events to USB or BLE
+// so callers no longer branch on isUsbMode.
+static KeyboardOutput &kbd() {
+    return isUsbMode ? static_cast<KeyboardOutput &>(usbOutput)
+                     : static_cast<KeyboardOutput &>(bleOutput);
+}
+
 byte layoutLength = 0;
 String currentLayout = "";
 // For maximum 10 layers
@@ -160,7 +170,7 @@ void setup() {
     printSpacer();
 
     Serial.println("Starting BLE work...");
-    bleKeyboard.begin();
+    BleHid::begin();
     // bleKeyboard.set_current_active_device(currentActiveDevice);
     UsbHid::begin();
 
@@ -350,7 +360,7 @@ void generalTask(void *pvParameters) {
     while (true) {
         checkBattery();
         
-        // if (isDetectingLastConnectedDevice && bleKeyboard.isConnected() &&
+        // if (isDetectingLastConnectedDevice && BleHid::isConnected() &&
         //     bleKeyboard.getCounnectedCount() > 1) {
         // isDetectingLastConnectedDevice = false;
         // std::array<std::string, 2> addresses =
@@ -453,7 +463,7 @@ void generalTask(void *pvParameters) {
         }
 
         // Show connecting message when BLE is disconnected
-        while (!isUsbMode && !bleKeyboard.isConnected()) {
+        while (!isUsbMode && !BleHid::isConnected()) {
             contentBottom = "Connecting BLE..";
             checkIdle();
             delay(100);
@@ -528,7 +538,7 @@ void ledTask(void *pvParameters) {
         } else {
             if (isScreenDisabled || isScreenSleeping) {
                 leds[0] = CRGB::Green;
-            } else if (!bleKeyboard.isConnected() && !isUsbMode) {
+            } else if (!BleHid::isConnected() && !isUsbMode) {
                 leds[0] = CRGB::Blue;
                 FastLED.show();
                 delay(300);
@@ -591,33 +601,16 @@ void encoderTask(void *pvParameters) {
 
             if (direction.equals("CCW")) {
                 resetIdle();
-                // USB mode
-                if (isUsbMode && !isOutputLocked) {
+                if (!isOutputLocked) {
                     if (onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
                             "MACRO_")) {
-                        size_t index =
-                            onboardRotaryEncoders[0]
-                                .rotaryCCWInfo
-                                .substring(6)
-                                .toInt();
+                        size_t index = onboardRotaryEncoders[0]
+                                           .rotaryCCWInfo.substring(6)
+                                           .toInt();
                         macroPress(macroMap[index]);
                     } else {
-                        UsbHid::release(onboardRotaryEncoders[0].rotaryCCW);
-                        UsbHid::write(onboardRotaryEncoders[0].rotaryCCW);
-                    }
-                    // BLE mode
-                } else if (!isOutputLocked) {
-                    if (onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
-                            "MACRO_")) {
-                        size_t index =
-                            onboardRotaryEncoders[0]
-                                .rotaryCCWInfo
-                                .substring(6)
-                                .toInt();
-                        macroPress(macroMap[index]);
-                    } else {
-                        bleKeyboard.release(onboardRotaryEncoders[0].rotaryCCW);
-                        bleKeyboard.write(onboardRotaryEncoders[0].rotaryCCW);
+                        kbd().release(onboardRotaryEncoders[0].rotaryCCW);
+                        kbd().write(onboardRotaryEncoders[0].rotaryCCW);
                     }
                 }
                 if (!onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
@@ -627,33 +620,16 @@ void encoderTask(void *pvParameters) {
                 }
             } else if (direction.equals("CW")) {
                 resetIdle();
-                // USB mode
-                if (isUsbMode && !isOutputLocked) {
+                if (!isOutputLocked) {
                     if (onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
                             "MACRO_")) {
-                        size_t index =
-                            onboardRotaryEncoders[0]
-                                .rotaryCWInfo
-                                .substring(6)
-                                .toInt();
+                        size_t index = onboardRotaryEncoders[0]
+                                           .rotaryCWInfo.substring(6)
+                                           .toInt();
                         macroPress(macroMap[index]);
                     } else {
-                        UsbHid::release(onboardRotaryEncoders[0].rotaryCW);
-                        UsbHid::write(onboardRotaryEncoders[0].rotaryCW);
-                    }
-                    // BLE mode
-                } else if (!isOutputLocked) {
-                    if (onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
-                            "MACRO_")) {
-                        size_t index =
-                            onboardRotaryEncoders[0]
-                                .rotaryCWInfo
-                                .substring(6)
-                                .toInt();
-                        macroPress(macroMap[index]);
-                    } else {
-                        bleKeyboard.release(onboardRotaryEncoders[0].rotaryCW);
-                        bleKeyboard.write(onboardRotaryEncoders[0].rotaryCW);
+                        kbd().release(onboardRotaryEncoders[0].rotaryCW);
+                        kbd().write(onboardRotaryEncoders[0].rotaryCW);
                     }
                 }
                 if (!onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
@@ -713,23 +689,15 @@ void encoderExtBoardTask(void *pvParameters) {
                 if (trigger) {
                     resetIdle();
                     if (direction.equals("CW")) {
-                        if (isUsbMode && !isOutputLocked) {
-                            UsbHid::write(
-                                rotaryExtRotaryEncoders[0].rotaryCW);
-                        } else if (!isOutputLocked) {
-                            bleKeyboard.write(
-                                rotaryExtRotaryEncoders[0].rotaryCW);
+                        if (!isOutputLocked) {
+                            kbd().write(rotaryExtRotaryEncoders[0].rotaryCW);
                         }
                         updateKeyInfo = true;
                         currentKeyInfo =
                             rotaryExtRotaryEncoders[0].rotaryCWInfo;
                     } else if (direction.equals("CCW")) {
-                        if (isUsbMode && !isOutputLocked) {
-                            UsbHid::write(
-                                rotaryExtRotaryEncoders[0].rotaryCCW);
-                        } else if (!isOutputLocked) {
-                            bleKeyboard.write(
-                                rotaryExtRotaryEncoders[0].rotaryCCW);
+                        if (!isOutputLocked) {
+                            kbd().write(rotaryExtRotaryEncoders[0].rotaryCCW);
                         }
                         updateKeyInfo = true;
                         currentKeyInfo =
@@ -906,7 +874,7 @@ void loop() {
                     } else if (r == 3 && c == 0) {
                         isUsbMode = !isUsbMode;
                         UsbHid::releaseAll();
-                        bleKeyboard.releaseAll();
+                        BleHid::releaseAll();
                         delay(300);
                     } else if (r == 4 && c == 4) {
                         switchLayout();
@@ -1191,7 +1159,7 @@ void readConfigButtons() {
         }
         isUsbMode = !isUsbMode;
         UsbHid::releaseAll();
-        bleKeyboard.releaseAll();
+        BleHid::releaseAll();
     }
 }
 
@@ -1239,78 +1207,6 @@ void resetConfigFiles() {
 }
 
 /**
- * Press USB HID keys. (Fix for modifier keys)
- *
- * @param {uint8_t} keyStroke the key stroke to be pressed
- */
-void usbKeyboardPress(uint8_t keyStroke) {
-    switch (keyStroke) {
-        case 128:  // KEY_LEFT_CTRL
-            UsbHid::pressRaw(0xe0);
-            break;
-        case 129:  // KEY_LEFT_SHIFT
-            UsbHid::pressRaw(0xe1);
-            break;
-        case 130:  // KEY_LEFT_ALT
-            UsbHid::pressRaw(0xe2);
-            break;
-        case 131:  // KEY_LEFT_GUI
-            UsbHid::pressRaw(0xe3);
-            break;
-        case 132:  // KEY_RIGHT_CTRL
-            UsbHid::pressRaw(0xe4);
-            break;
-        case 133:  // KEY_RIGHT_SHIFT
-            UsbHid::pressRaw(0xe5);
-            break;
-        case 134:  // KEY_RIGHT_ALT
-            UsbHid::pressRaw(0xe6);
-            break;
-        case 135:  // KEY_RIGHT_GUI
-            UsbHid::pressRaw(0xe7);
-            break;
-        default:
-            UsbHid::press(keyStroke);
-    }
-}
-
-/**
- * Release USB HID keys. (Fix for modifier keys)
- *
- * @param {uint8_t} keyStroke the key stroke to be pressed
- */
-void usbKeyboardRelease(uint8_t keyStroke) {
-    switch (keyStroke) {
-        case 128:  // KEY_LEFT_CTRL
-            UsbHid::releaseRaw(0xe0);
-            break;
-        case 129:  // KEY_LEFT_SHIFT
-            UsbHid::releaseRaw(0xe1);
-            break;
-        case 130:  // KEY_LEFT_ALT
-            UsbHid::releaseRaw(0xe2);
-            break;
-        case 131:  // KEY_LEFT_GUI
-            UsbHid::releaseRaw(0xe3);
-            break;
-        case 132:  // KEY_RIGHT_CTRL
-            UsbHid::releaseRaw(0xe4);
-            break;
-        case 133:  // KEY_RIGHT_SHIFT
-            UsbHid::releaseRaw(0xe5);
-            break;
-        case 134:  // KEY_RIGHT_ALT
-            UsbHid::releaseRaw(0xe6);
-            break;
-        case 135:  // KEY_RIGHT_GUI
-            UsbHid::releaseRaw(0xe7);
-            break;
-        default:
-            UsbHid::release(keyStroke);
-    }
-}
-
-/**
  * Press key
  *
  * @param {Key} key the key to be pressed
@@ -1320,11 +1216,7 @@ void keyPress(Key &key) {
         isFnKeyPressed = true;
     }
     if (key.state == false && !isOutputLocked) {
-        if (isUsbMode) {
-            usbKeyboardPress(key.keyStroke);
-        } else {
-            bleKeyboard.press(key.keyStroke);
-        }
+        kbd().press(key.keyStroke);
     }
     key.state = true;
     updateKeyInfo = true;
@@ -1336,11 +1228,7 @@ bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState) {
         isFnKeyPressed = true;
     }
     if (keyState == false && !isOutputLocked) {
-        if (isUsbMode) {
-            usbKeyboardPress(keyStroke);
-        } else {
-            bleKeyboard.press(keyStroke);
-        }
+        kbd().press(keyStroke);
     }
     keyState = true;
     updateKeyInfo = true;
@@ -1358,11 +1246,7 @@ void keyRelease(Key &key) {
         isFnKeyPressed = false;
     }
     if (key.state == true && !isOutputLocked) {
-        if (isUsbMode) {
-            usbKeyboardRelease(key.keyStroke);
-        } else {
-            bleKeyboard.release(key.keyStroke);
-        }
+        kbd().release(key.keyStroke);
     }
     key.state = false;
     return;
@@ -1373,11 +1257,7 @@ bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState) {
         isFnKeyPressed = false;
     }
     if (keyState == true && !isOutputLocked) {
-        if (isUsbMode) {
-            usbKeyboardRelease(keyStroke);
-        } else {
-            bleKeyboard.release(keyStroke);
-        }
+        kbd().release(keyStroke);
     }
     keyState = false;
     return keyState;
@@ -1397,31 +1277,15 @@ void macroPress(Macro &macro) {
     if (macro.type == 0) {
         size_t length = sizeof(macro.keyStrokes);
         for (size_t i = 0; i < length; i++) {
-            if (isUsbMode) {
-                UsbHid::press(macro.keyStrokes[i]);
-            } else {
-                bleKeyboard.press(macro.keyStrokes[i]);
-            }
+            kbd().press(macro.keyStrokes[i]);
             delayMicroseconds(10);
         }
         delay(50);
-        if (isUsbMode) {
-            UsbHid::releaseAll();
-        } else {
-            bleKeyboard.releaseAll();
-        }
+        kbd().releaseAll();
     } else if (macro.type == 1) {
-        if (isUsbMode) {
-            UsbHid::print(macro.stringContent);
-        } else {
-            bleKeyboard.print(macro.stringContent);
-        }
+        kbd().print(macro.stringContent);
     } else if (macro.type == 2) {
-        if (isUsbMode) {
-            UsbHid::println(macro.stringContent);
-        } else {
-            bleKeyboard.println(macro.stringContent);
-        }
+        kbd().println(macro.stringContent);
     }
     delay(100);
 }
@@ -1624,7 +1488,7 @@ int getBatteryPercentage() {
     if (percentage > 100) percentage = 100;
 
     // Update device's battery level
-    bleKeyboard.setBatteryLevel(percentage);
+    BleHid::setBatteryLevel(percentage);
 
     return percentage;
 }

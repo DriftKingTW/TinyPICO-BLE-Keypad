@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <BleKeyboard.h>
 #include <EEPROM.h>
 #include <ESP32Encoder.h>
 #include <ESPmDNS.h>
@@ -24,16 +23,13 @@
 
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
-#include "usbhid.h"
+#include "keyboard_output.h"
 
 using namespace std;
 
 #define BAUD_RATE 115200
 #define EEPROM_SIZE 1
 #define EEPROM_ADDR_LAYOUT 0
-
-#define BLE_NAME "Schnell Keypad"
-#define AUTHOR "DriftKingTW"
 
 // Injected at build time from git (see scripts/version.py).
 // Fallback for builds outside the PlatformIO toolchain.
@@ -120,8 +116,6 @@ void i2cTask(void *);
 void initKeys();
 void initMacros();
 void updateKeymaps();
-void usbKeyboardPress(uint8_t keyStroke);
-void usbKeyboardRelease(uint8_t keyStroke);
 void keyPress(Key &key);
 bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState);
 void keyRelease(Key &key);
