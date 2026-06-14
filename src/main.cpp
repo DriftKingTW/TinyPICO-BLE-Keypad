@@ -307,7 +307,8 @@ void setup() {
             EEPROM.write(EEPROM_ADDR_LAYOUT, currentLayoutIndex);
             EEPROM.commit();
         } else {
-            Serial.println("EEPROM saved layout index: " + savedLayoutIndex);
+            Serial.println("EEPROM saved layout index: " +
+                           String(savedLayoutIndex));
             currentLayoutIndex = savedLayoutIndex;
         }
     }
@@ -597,9 +598,7 @@ void encoderTask(void *pvParameters) {
                         size_t index =
                             onboardRotaryEncoders[0]
                                 .rotaryCCWInfo
-                                .substring(6, sizeof(onboardRotaryEncoders[0]
-                                                         .rotaryCCWInfo) -
-                                                  1)
+                                .substring(6)
                                 .toInt();
                         macroPress(macroMap[index]);
                     } else {
@@ -613,9 +612,7 @@ void encoderTask(void *pvParameters) {
                         size_t index =
                             onboardRotaryEncoders[0]
                                 .rotaryCCWInfo
-                                .substring(6, sizeof(onboardRotaryEncoders[0]
-                                                         .rotaryCCWInfo) -
-                                                  1)
+                                .substring(6)
                                 .toInt();
                         macroPress(macroMap[index]);
                     } else {
@@ -637,11 +634,7 @@ void encoderTask(void *pvParameters) {
                         size_t index =
                             onboardRotaryEncoders[0]
                                 .rotaryCWInfo
-                                .substring(
-                                    6,
-                                    sizeof(
-                                        onboardRotaryEncoders[0].rotaryCWInfo) -
-                                        1)
+                                .substring(6)
                                 .toInt();
                         macroPress(macroMap[index]);
                     } else {
@@ -655,11 +648,7 @@ void encoderTask(void *pvParameters) {
                         size_t index =
                             onboardRotaryEncoders[0]
                                 .rotaryCWInfo
-                                .substring(
-                                    6,
-                                    sizeof(
-                                        onboardRotaryEncoders[0].rotaryCWInfo) -
-                                        1)
+                                .substring(6)
                                 .toInt();
                         macroPress(macroMap[index]);
                     } else {
@@ -772,7 +761,6 @@ void encoderExtBoardTask(void *pvParameters) {
                                 rotaryExtRotaryEncoders[0].rotaryButtonInfo,
                                 rotaryExtRotaryEncoders[0].rotaryButtonState);
                             break;
-                            break;
                         case extensionBtn1:
                             rotaryExtKeyMap[0].state =
                                 keyPress(rotaryExtKeyMap[0].keyStroke,
@@ -844,11 +832,11 @@ void i2cTask(void *pvParameters) {
     while (true) {
         renderScreen();
 
-        for (byte i : devices) {
-            Wire.beginTransmission(devices[i]);
+        for (byte addr : devices) {
+            Wire.beginTransmission(addr);
             error = Wire.endTransmission();
 
-            if (devices[i] == ENCODER_EXTENSION_ADDR) {
+            if (addr == ENCODER_EXTENSION_ADDR) {
                 isRotaryExtensionConnected = (error == 0);
             }
         }
@@ -939,8 +927,7 @@ void loop() {
                     // Macro press
                     size_t index =
                         keyMap[r][c]
-                            .keyInfo
-                            .substring(6, sizeof(keyMap[r][c].keyInfo) - 1)
+                            .keyInfo.substring(6)
                             .toInt();
                     macroPress(macroMap[index]);
                 } else if (keyMap[r][c].keyInfo.startsWith("TT_")) {
@@ -948,8 +935,7 @@ void loop() {
                     if (!isTemporaryToggled) {
                         size_t index =
                             keyMap[r][c]
-                                .keyInfo
-                                .substring(3, sizeof(keyMap[r][c].keyInfo) - 1)
+                                .keyInfo.substring(3)
                                 .toInt();
                         tapToggleActive(index);
                     }
@@ -1549,22 +1535,14 @@ void setCPUFrequency(int freq) {
  * @param {char} array to print on oled screen
  */
 void renderScreen() {
-    // string to char array
-    int nTop = contentBottom.length();
-    char charArrayTop[nTop];
-    strcpy(charArrayTop, contentBottom.c_str());
-
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
-    u8g2.drawStr(16 + 4, 24, charArrayTop);
+    u8g2.drawStr(16 + 4, 24, contentBottom.c_str());
 
-    int nBottom = contentTop.length();
-    char charArrayBottom[nBottom];
-    strcpy(charArrayBottom, contentTop.c_str());
     u8g2.setFont(u8g2_font_ncenB08_tr);
     u8g2.setFontPosCenter();
-    u8g2.drawStr(16 + 4, 10, charArrayBottom);
+    u8g2.drawStr(16 + 4, 10, contentTop.c_str());
 
     u8g2.setFont(u8g2_font_open_iconic_all_2x_t);
     switch (contentIcon) {
@@ -1641,10 +1619,14 @@ int getBatteryPercentage() {
     // Percentage step by 5
     percentage = round(percentage / 5) * 5;
 
+    // Clamp to a valid 0-100 range (voltage below minVoltage yields negatives)
+    if (percentage < 0) percentage = 0;
+    if (percentage > 100) percentage = 100;
+
     // Update device's battery level
     bleKeyboard.setBatteryLevel(percentage);
 
-    return percentage > 100 ? 100 : percentage;
+    return percentage;
 }
 
 /**
@@ -2084,7 +2066,7 @@ void handleRoot() {
         file.close();
     } else {
         Serial.println(F("index not found on SPIFFS"));
-        handleNotFound;
+        handleNotFound();
     }
 }
 
