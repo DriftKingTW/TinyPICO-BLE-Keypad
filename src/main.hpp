@@ -36,6 +36,12 @@ using namespace std;
 #define BLE_NAME "Schnell Keypad"
 #define AUTHOR "DriftKingTW"
 
+// Injected at build time from git (see scripts/version.py).
+// Fallback for builds outside the PlatformIO toolchain.
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "dev"
+#endif
+
 #define ACTIVE LOW
 #define WAKEUP_KEY_BITMAP 0x1000  // Pin 12
 

@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # required to create the GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PIO_ENV: esp32-s3-wroom-1-n4r2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so version.py reports the tag
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: ${{ runner.os }}-pio-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build firmware
+        run: pio run -e $PIO_ENV
+
+      - name: Build SPIFFS filesystem image
+        run: pio run -e $PIO_ENV -t buildfs
+
+      - name: Merge firmware into a single flashable image
+        run: pio run -e $PIO_ENV -t mergebin
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          BUILD=.pio/build/$PIO_ENV
+          cp "$BUILD/firmware.bin"        dist/
+          cp "$BUILD/firmware-merged.bin" dist/
+          cp "$BUILD/bootloader.bin"      dist/
+          cp "$BUILD/partitions.bin"      dist/
+          cp "$BUILD/spiffs.bin"          dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
