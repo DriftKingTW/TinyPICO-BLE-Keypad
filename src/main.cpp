@@ -1178,6 +1178,10 @@ void keyRelease(Key &key) {
 void macroPress(Macro &macro) {
     updateKeyInfo = true;
     currentKeyInfo = macro.macroInfo;
+    // Respect output lock (matches keyPress: still show the info, emit nothing)
+    if (isOutputLocked) {
+        return;
+    }
     if (macro.type == 0) {
         size_t length = sizeof(macro.keyStrokes);
         for (size_t i = 0; i < length; i++) {
