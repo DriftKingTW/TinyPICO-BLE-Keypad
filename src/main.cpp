@@ -600,43 +600,11 @@ void encoderTask(void *pvParameters) {
             }
 
             if (direction.equals("CCW")) {
-                resetIdle();
-                if (!isOutputLocked) {
-                    if (onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
-                            "MACRO_")) {
-                        size_t index = onboardRotaryEncoders[0]
-                                           .rotaryCCWInfo.substring(6)
-                                           .toInt();
-                        macroPress(macroMap[index]);
-                    } else {
-                        kbd().release(onboardRotaryEncoders[0].rotaryCCW);
-                        kbd().write(onboardRotaryEncoders[0].rotaryCCW);
-                    }
-                }
-                if (!onboardRotaryEncoders[0].rotaryCCWInfo.startsWith(
-                        "MACRO_")) {
-                    updateKeyInfo = true;
-                    currentKeyInfo = onboardRotaryEncoders[0].rotaryCCWInfo;
-                }
+                emitEncoderTurn(onboardRotaryEncoders[0].rotaryCCW,
+                                onboardRotaryEncoders[0].rotaryCCWInfo);
             } else if (direction.equals("CW")) {
-                resetIdle();
-                if (!isOutputLocked) {
-                    if (onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
-                            "MACRO_")) {
-                        size_t index = onboardRotaryEncoders[0]
-                                           .rotaryCWInfo.substring(6)
-                                           .toInt();
-                        macroPress(macroMap[index]);
-                    } else {
-                        kbd().release(onboardRotaryEncoders[0].rotaryCW);
-                        kbd().write(onboardRotaryEncoders[0].rotaryCW);
-                    }
-                }
-                if (!onboardRotaryEncoders[0].rotaryCWInfo.startsWith(
-                        "MACRO_")) {
-                    updateKeyInfo = true;
-                    currentKeyInfo = onboardRotaryEncoders[0].rotaryCWInfo;
-                }
+                emitEncoderTurn(onboardRotaryEncoders[0].rotaryCW,
+                                onboardRotaryEncoders[0].rotaryCWInfo);
             }
         }
 
@@ -714,75 +682,39 @@ void encoderExtBoardTask(void *pvParameters) {
                     resetIdle();
                     switch (btnArray[i]) {
                         case encoderSW:
-                            // when using keyboard.write
-                            // if (millis() - rotaryEncoderLastButtonPress >
-                            // 200) {
-                            //     bleKeyboard.write(
-                            //         rotaryExtRotaryEncoders[0].rotaryButton);
-                            //     updateKeyInfo = true;
-                            //     currentKeyInfo = rotaryExtRotaryEncoders[0]
-                            //                          .rotaryButtonInfo;
-                            // }
-                            rotaryExtRotaryEncoders[0]
-                                .rotaryButtonState = keyPress(
-                                rotaryExtRotaryEncoders[0].rotaryButton,
-                                rotaryExtRotaryEncoders[0].rotaryButtonInfo,
-                                rotaryExtRotaryEncoders[0].rotaryButtonState);
+                            keyPress(rotaryExtRotaryEncoders[0].button);
                             break;
                         case extensionBtn1:
-                            rotaryExtKeyMap[0].state =
-                                keyPress(rotaryExtKeyMap[0].keyStroke,
-                                         rotaryExtKeyMap[0].keyInfo,
-                                         rotaryExtKeyMap[0].state);
+                            keyPress(rotaryExtKeyMap[0]);
                             break;
                         case extensionBtn2:
-                            rotaryExtKeyMap[1].state =
-                                keyPress(rotaryExtKeyMap[1].keyStroke,
-                                         rotaryExtKeyMap[1].keyInfo,
-                                         rotaryExtKeyMap[1].state);
+                            keyPress(rotaryExtKeyMap[1]);
                             break;
                         case extensionBtn3:
-                            rotaryExtKeyMap[2].state =
-                                keyPress(rotaryExtKeyMap[2].keyStroke,
-                                         rotaryExtKeyMap[2].keyInfo,
-                                         rotaryExtKeyMap[2].state);
+                            keyPress(rotaryExtKeyMap[2]);
                             break;
                     }
                     rotaryEncoderLastButtonPress = millis();
                 } else if (btnState == HIGH) {
                     switch (btnArray[i]) {
                         case encoderSW:
-                            if (rotaryExtRotaryEncoders[0].rotaryButtonState) {
-                                rotaryExtRotaryEncoders[0]
-                                    .rotaryButtonState = keyRelease(
-                                    rotaryExtRotaryEncoders[0].rotaryButton,
-                                    rotaryExtRotaryEncoders[0].rotaryButtonInfo,
-                                    rotaryExtRotaryEncoders[0]
-                                        .rotaryButtonState);
+                            if (rotaryExtRotaryEncoders[0].button.state) {
+                                keyRelease(rotaryExtRotaryEncoders[0].button);
                             }
                             break;
                         case extensionBtn1:
                             if (rotaryExtKeyMap[0].state) {
-                                rotaryExtKeyMap[0].state =
-                                    keyRelease(rotaryExtKeyMap[0].keyStroke,
-                                               rotaryExtKeyMap[0].keyInfo,
-                                               rotaryExtKeyMap[0].state);
+                                keyRelease(rotaryExtKeyMap[0]);
                             }
                             break;
                         case extensionBtn2:
                             if (rotaryExtKeyMap[1].state) {
-                                rotaryExtKeyMap[1].state =
-                                    keyRelease(rotaryExtKeyMap[1].keyStroke,
-                                               rotaryExtKeyMap[1].keyInfo,
-                                               rotaryExtKeyMap[1].state);
+                                keyRelease(rotaryExtKeyMap[1]);
                             }
                             break;
                         case extensionBtn3:
                             if (rotaryExtKeyMap[2].state) {
-                                rotaryExtKeyMap[2].state =
-                                    keyRelease(rotaryExtKeyMap[2].keyStroke,
-                                               rotaryExtKeyMap[2].keyInfo,
-                                               rotaryExtKeyMap[2].state);
+                                keyRelease(rotaryExtKeyMap[2]);
                             }
                             break;
                     }
@@ -893,11 +825,7 @@ void loop() {
                     }
                 } else if (keyMap[r][c].keyInfo.startsWith("MACRO_")) {
                     // Macro press
-                    size_t index =
-                        keyMap[r][c]
-                            .keyInfo.substring(6)
-                            .toInt();
-                    macroPress(macroMap[index]);
+                    macroPressByInfo(keyMap[r][c].keyInfo);
                 } else if (keyMap[r][c].keyInfo.startsWith("TT_")) {
                     // Tap-Toggle press
                     if (!isTemporaryToggled) {
@@ -1010,11 +938,11 @@ void initKeys() {
         for (int i = 0; i < sizeof(onboardRotaryEncoders) /
                                 sizeof(onboardRotaryEncoders[0]);
              i++) {
-            onboardRotaryEncoders[0].rotaryButton =
+            onboardRotaryEncoders[0].button.keyStroke =
                 onboardRotaryEncoderRotaryMap[0];
-            onboardRotaryEncoders[0].rotaryButtonInfo =
+            onboardRotaryEncoders[0].button.keyInfo =
                 onboardRotaryEncoderInfo[0];
-            onboardRotaryEncoders[0].rotaryButtonState = false;
+            onboardRotaryEncoders[0].button.state = false;
             onboardRotaryEncoders[0].rotaryCCW =
                 onboardRotaryEncoderRotaryMap[1];
             onboardRotaryEncoders[0].rotaryCW =
@@ -1049,9 +977,9 @@ void initKeys() {
             rotaryExtKeyMap[i].state = false;
         }
         // Assign rotary encoder data
-        rotaryExtRotaryEncoders[0].rotaryButton = rotaryExtRotaryMap[0];
-        rotaryExtRotaryEncoders[0].rotaryButtonInfo = rotaryExtRotaryInfo[0];
-        rotaryExtRotaryEncoders[0].rotaryButtonState = false;
+        rotaryExtRotaryEncoders[0].button.keyStroke = rotaryExtRotaryMap[0];
+        rotaryExtRotaryEncoders[0].button.keyInfo = rotaryExtRotaryInfo[0];
+        rotaryExtRotaryEncoders[0].button.state = false;
         rotaryExtRotaryEncoders[0].rotaryCCW = rotaryExtRotaryMap[1];
         rotaryExtRotaryEncoders[0].rotaryCW = rotaryExtRotaryMap[2];
         rotaryExtRotaryEncoders[0].rotaryCCWInfo = rotaryExtRotaryInfo[1];
@@ -1223,19 +1151,6 @@ void keyPress(Key &key) {
     currentKeyInfo = key.keyInfo;
 }
 
-bool keyPress(uint8_t keyStroke, String keyInfo, bool keyState) {
-    if (keyInfo == "FN") {
-        isFnKeyPressed = true;
-    }
-    if (keyState == false && !isOutputLocked) {
-        kbd().press(keyStroke);
-    }
-    keyState = true;
-    updateKeyInfo = true;
-    currentKeyInfo = keyInfo;
-    return keyState;
-}
-
 /**
  * Release key
  *
@@ -1252,17 +1167,6 @@ void keyRelease(Key &key) {
     return;
 }
 
-bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState) {
-    if (keyInfo == "FN") {
-        isFnKeyPressed = false;
-    }
-    if (keyState == true && !isOutputLocked) {
-        kbd().release(keyStroke);
-    }
-    keyState = false;
-    return keyState;
-}
-
 /**
  * Press macro keys
  *
@@ -1274,6 +1178,10 @@ bool keyRelease(uint8_t keyStroke, String keyInfo, bool keyState) {
 void macroPress(Macro &macro) {
     updateKeyInfo = true;
     currentKeyInfo = macro.macroInfo;
+    // Respect output lock (matches keyPress: still show the info, emit nothing)
+    if (isOutputLocked) {
+        return;
+    }
     if (macro.type == 0) {
         size_t length = sizeof(macro.keyStrokes);
         for (size_t i = 0; i < length; i++) {
@@ -1288,6 +1196,39 @@ void macroPress(Macro &macro) {
         kbd().println(macro.stringContent);
     }
     delay(100);
+}
+
+/**
+ * Press the macro referenced by a "MACRO_<index>" key info string
+ *
+ * @param {String} info key info of the form "MACRO_<index>"
+ */
+void macroPressByInfo(const String &info) {
+    macroPress(macroMap[info.substring(6).toInt()]);
+}
+
+/**
+ * Emit a single rotary-encoder turn for the given key info. Triggers a macro
+ * for "MACRO_<index>" info, otherwise taps the key code on the active output.
+ *
+ * @param {uint8_t} keyStroke the key code to tap
+ * @param {String} info key info describing the turn
+ */
+void emitEncoderTurn(uint8_t keyStroke, const String &info) {
+    resetIdle();
+    bool isMacro = info.startsWith("MACRO_");
+    if (!isOutputLocked) {
+        if (isMacro) {
+            macroPressByInfo(info);
+        } else {
+            kbd().release(keyStroke);
+            kbd().write(keyStroke);
+        }
+    }
+    if (!isMacro) {
+        updateKeyInfo = true;
+        currentKeyInfo = info;
+    }
 }
 
 /**
