@@ -9,7 +9,7 @@ UsbKeyboardOutput usbOutput;
 BleKeyboardOutput bleOutput;
 
 PCF8574 pcf8574RotaryExtension(ENCODER_EXTENSION_ADDR);
-bool isRotaryExtensionConnected = false;
+volatile bool isRotaryExtensionConnected = false;
 
 TaskHandle_t TaskGeneralStatusCheck;
 TaskHandle_t TaskLED;
@@ -48,12 +48,12 @@ ESP32Encoder onboardEncoders[1] = {ESP32Encoder()};
 RotaryEncoderConfig onboardRotaryEncoders[1] = {RotaryEncoderConfig()};
 
 ConfigStore configStore;
-bool isFnKeyPressed = false;
+volatile bool isFnKeyPressed = false;
 bool isDetectingLastConnectedDevice = true;
 RTC_DATA_ATTR byte currentLayoutIndex = 0;
 RTC_DATA_ATTR byte currentActiveDevice = 0;
 RTC_DATA_ATTR String currentActiveDeviceAddress = "";
-RTC_DATA_ATTR bool isUsbMode = true;
+RTC_DATA_ATTR volatile bool isUsbMode = true;
 
 // Active keyboard output for the current mode. Routes key events to USB or BLE
 // so callers no longer branch on isUsbMode.
@@ -95,22 +95,26 @@ const long NETWORK_INFO_INTERVAL = 5 * 1000;
 unsigned long tapTogglePreviousMillis = 0;
 uint8_t tapToggleCount = 0;
 
-unsigned long currentMillis = 0;
+// Updated in ledTask, read by every task's timing checks across both cores.
+volatile unsigned long currentMillis = 0;
 
-bool isLowBattery = false;
+volatile bool isLowBattery = false;
 int batteryPercentage = 101;
 
-bool keymapsNeedsUpdate = false;
-bool configUpdated = false;
-bool isSoftAPEnabled = false;
-bool isGoingToSleep = false;
-bool clearDisplay = false;
-bool isSwitchingBootMode = false;
-bool isCaffeinated = false;
-bool isOutputLocked = false;
-bool isScreenInverted = false;
-bool isScreenDisabled = false;
-bool isScreenSleeping = false;
+// Mode/status flags shared between tasks on both cores. volatile guarantees
+// each task reads the current value rather than a cached copy. (Aligned bool
+// access is already atomic on the ESP32, so no torn reads.)
+volatile bool keymapsNeedsUpdate = false;
+volatile bool configUpdated = false;
+volatile bool isSoftAPEnabled = false;
+volatile bool isGoingToSleep = false;
+volatile bool clearDisplay = false;
+volatile bool isSwitchingBootMode = false;
+volatile bool isCaffeinated = false;
+volatile bool isOutputLocked = false;
+volatile bool isScreenInverted = false;
+volatile bool isScreenDisabled = false;
+volatile bool isScreenSleeping = false;
 
 // OLED screen content lives in the Display module (display_state.h). Icon codes:
 // loading: 0, ble: 1, wifi: 2, ap: 3, charging: 4, plugged in: 5,
