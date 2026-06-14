@@ -22,10 +22,9 @@
 #include <iterator>
 #include <string>
 
-#include "USB.h"
-#include "USBHIDKeyboard.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "usbhid.h"
 
 using namespace std;
 
