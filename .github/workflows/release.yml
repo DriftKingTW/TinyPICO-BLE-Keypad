@@ -59,3 +59,19 @@ jobs:
           files: dist/*
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+      # Tell the web configuration tool to pull these release assets and
+      # redeploy GitHub Pages. Requires a PAT with write access to that repo
+      # stored as the WEB_TOOL_DISPATCH_TOKEN secret (GITHUB_TOKEN cannot
+      # dispatch across repositories).
+      - name: Notify configuration tool
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.WEB_TOOL_DISPATCH_TOKEN }}
+          repository: DriftKingTW/Schnell-Keypad-Configuration-Tool
+          event-type: firmware-released
+          client-payload: |
+            {
+              "tag": "${{ github.ref_name }}",
+              "prerelease": ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+            }
