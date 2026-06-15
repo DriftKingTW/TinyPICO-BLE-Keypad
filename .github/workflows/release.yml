@@ -95,6 +95,7 @@ jobs:
               DESC="$MSG"
             fi
           fi
+          echo "Discord announcement description:"; printf '%s\n' "$DESC"
           payload=$(jq -n \
             --arg title "⌨️ Schnell Keypad firmware $TAG ($CHANNEL)" \
             --arg desc "$DESC" \
