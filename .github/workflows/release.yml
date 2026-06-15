@@ -81,9 +81,20 @@ jobs:
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
           # ?channel= preselects the matching build in the installer dropdown.
           INSTALLER_URL="https://blog.driftking.tw/Schnell-Keypad-Configuration-Tool/?channel=$SLUG"
+          # Use the annotated tag message (git tag -a <tag> -m "...") as a short,
+          # user-facing summary. Lightweight tags have no message -> generic line.
+          DESC="A new **$CHANNEL** firmware build is available."
+          if [ "$(git cat-file -t "$TAG" 2>/dev/null)" = "tag" ]; then
+            MSG="$(git tag -l "$TAG" --format='%(contents:subject)%0a%0a%(contents:body)' \
+              | sed '/-----BEGIN PGP SIGNATURE-----/,$d')"
+            MSG="$(printf '%s' "$MSG" | sed -e 's/[[:space:]]*$//')"
+            if [ -n "$(printf '%s' "$MSG" | tr -d '[:space:]')" ]; then
+              DESC="$MSG"
+            fi
+          fi
           payload=$(jq -n \
-            --arg title "🎹 Schnell Keypad firmware $TAG ($CHANNEL)" \
-            --arg desc "A new **$CHANNEL** firmware build is available." \
+            --arg title "⌨️ Schnell Keypad firmware $TAG ($CHANNEL)" \
+            --arg desc "$DESC" \
             --arg rel "$RELEASE_URL" \
             --arg inst "$INSTALLER_URL" \
             --argjson color "$COLOR" \
