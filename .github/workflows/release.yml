@@ -74,12 +74,13 @@ jobs:
             exit 0
           fi
           if [ "$PRERELEASE" = "true" ]; then
-            CHANNEL="Beta"; COLOR=16753920
+            CHANNEL="Beta"; SLUG="beta"; COLOR=16753920
           else
-            CHANNEL="Stable"; COLOR=5763719
+            CHANNEL="Stable"; SLUG="stable"; COLOR=5763719
           fi
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
-          INSTALLER_URL="https://blog.driftking.tw/Schnell-Keypad-Configuration-Tool/"
+          # ?channel= preselects the matching build in the installer dropdown.
+          INSTALLER_URL="https://blog.driftking.tw/Schnell-Keypad-Configuration-Tool/?channel=$SLUG"
           payload=$(jq -n \
             --arg title "🎹 Schnell Keypad firmware $TAG ($CHANNEL)" \
             --arg desc "A new **$CHANNEL** firmware build is available." \
