@@ -84,6 +84,9 @@ jobs:
           # Use the annotated tag message (git tag -a <tag> -m "...") as a short,
           # user-facing summary. Lightweight tags have no message -> generic line.
           DESC="A new **$CHANNEL** firmware build is available."
+          # actions/checkout leaves the tag as a lightweight ref pointing at the
+          # commit, so fetch the real (annotated) tag object before reading it.
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG" 2>/dev/null || true
           if [ "$(git cat-file -t "$TAG" 2>/dev/null)" = "tag" ]; then
             MSG="$(git tag -l "$TAG" --format='%(contents:subject)%0a%0a%(contents:body)' \
               | sed '/-----BEGIN PGP SIGNATURE-----/,$d')"
