@@ -116,9 +116,12 @@ GitHub Actions handles builds and releases automatically:
 The in-firmware version string is injected from the git tag at build time
 (`scripts/version.py`), so it always matches the release.
 
+Use an **annotated** tag — its message is reused as the Discord announcement
+text (see below), so write a short, user-facing summary:
+
 ```bash
-git tag -a v1.2.0 -m "Release v1.2.0"   # use -beta.N / -rc.N for pre-releases
-git push origin v1.2.0
+git tag -a v1.2.0 -m "Add macro export; fix occasional Bluetooth disconnects."
+git push origin v1.2.0   # use -beta.N / -rc.N for pre-releases
 ```
 
 ### Auto-publish to the web installer
@@ -136,6 +139,17 @@ to its in-browser firmware installer — no manual upload needed.
 This requires a `WEB_TOOL_DISPATCH_TOKEN` repository secret — a Personal Access
 Token with `Contents: read and write` on the configuration-tool repo (the
 default `GITHUB_TOKEN` cannot trigger workflows across repositories).
+
+### Discord announcement
+
+`release.yml` also posts an announcement to a Discord channel: the version and
+channel (Stable/Beta), a link to the in-browser installer (pre-selected to the
+matching channel), and a link to the GitHub release.
+
+- The embed description uses the **annotated tag message**, so keep it short and
+  user-facing. A lightweight tag (no message) falls back to a generic line.
+- Set a `DISCORD_WEBHOOK_URL` repository secret to a channel webhook. The step
+  is skipped if it is unset and never fails the release if Discord is down.
 
 ## License
 
