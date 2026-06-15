@@ -109,16 +109,47 @@ GitHub Actions handles builds and releases automatically:
 - **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — compiles on
   every push / PR to `master`.
 - **Release** ([`.github/workflows/release.yml`](.github/workflows/release.yml))
-  — pushing a `v*` tag builds the firmware, SPIFFS image and merged binary, then
-  publishes a GitHub Release with the artifacts attached.
+  — pushing a `v*` tag builds the firmware, SPIFFS image and merged binary,
+  publishes a GitHub Release with the artifacts attached, and then notifies the
+  web configuration tool (see below).
 
 The in-firmware version string is injected from the git tag at build time
 (`scripts/version.py`), so it always matches the release.
 
+Use an **annotated** tag — its message is reused as the Discord announcement
+text (see below), so write a short, user-facing summary:
+
 ```bash
-git tag -a v1.2.0 -m "Release v1.2.0"   # use -beta.N / -rc.N for pre-releases
-git push origin v1.2.0
+git tag -a v1.2.0 -m "Add macro export; fix occasional Bluetooth disconnects."
+git push origin v1.2.0   # use -beta.N / -rc.N for pre-releases
 ```
+
+### Auto-publish to the web installer
+
+After the release is created, `release.yml` sends a `repository_dispatch` to the
+[Schnell Keypad Configuration Tool](https://github.com/DriftKingTW/Schnell-Keypad-Configuration-Tool),
+which downloads the new `firmware-merged.bin` + `spiffs.bin` and publishes them
+to its in-browser firmware installer — no manual upload needed.
+
+- A **stable** tag (e.g. `v1.2.0`) updates the installer's *stable* channel and
+  is archived so it stays selectable as an older version.
+- A **pre-release** tag (containing `beta`/`rc`, e.g. `v1.2.0-beta.1`) updates
+  the *beta* channel, which only ever keeps the latest build.
+
+This requires a `WEB_TOOL_DISPATCH_TOKEN` repository secret — a Personal Access
+Token with `Contents: read and write` on the configuration-tool repo (the
+default `GITHUB_TOKEN` cannot trigger workflows across repositories).
+
+### Discord announcement
+
+`release.yml` also posts an announcement to a Discord channel: the version and
+channel (Stable/Beta), a link to the in-browser installer (pre-selected to the
+matching channel), and a link to the GitHub release.
+
+- The embed description uses the **annotated tag message**, so keep it short and
+  user-facing. A lightweight tag (no message) falls back to a generic line.
+- Set a `DISCORD_WEBHOOK_URL` repository secret to a channel webhook. The step
+  is skipped if it is unset and never fails the release if Discord is down.
 
 ## License
 
