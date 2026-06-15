@@ -60,6 +60,63 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
 
+      # Announce the release in the Discord channel. Set the DISCORD_WEBHOOK_URL
+      # repository secret to a channel webhook; the step is skipped if unset and
+      # never fails the release on a Discord error.
+      - name: Announce on Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK_URL not set, skipping announcement."
+            exit 0
+          fi
+          if [ "$PRERELEASE" = "true" ]; then
+            CHANNEL="Beta"; SLUG="beta"; COLOR=16753920
+          else
+            CHANNEL="Stable"; SLUG="stable"; COLOR=5763719
+          fi
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          # ?channel= preselects the matching build in the installer dropdown.
+          INSTALLER_URL="https://blog.driftking.tw/Schnell-Keypad-Configuration-Tool/?channel=$SLUG"
+          # Use the annotated tag message (git tag -a <tag> -m "...") as a short,
+          # user-facing summary. Lightweight tags have no message -> generic line.
+          DESC="A new **$CHANNEL** firmware build is available."
+          # actions/checkout leaves the tag as a lightweight ref pointing at the
+          # commit, so fetch the real (annotated) tag object before reading it.
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG" 2>/dev/null || true
+          if [ "$(git cat-file -t "$TAG" 2>/dev/null)" = "tag" ]; then
+            MSG="$(git tag -l "$TAG" --format='%(contents:subject)%0a%0a%(contents:body)' \
+              | sed '/-----BEGIN PGP SIGNATURE-----/,$d')"
+            MSG="$(printf '%s' "$MSG" | sed -e 's/[[:space:]]*$//')"
+            if [ -n "$(printf '%s' "$MSG" | tr -d '[:space:]')" ]; then
+              DESC="$MSG"
+            fi
+          fi
+          echo "Discord announcement description:"; printf '%s\n' "$DESC"
+          payload=$(jq -n \
+            --arg title "⌨️ Schnell Keypad firmware $TAG ($CHANNEL)" \
+            --arg desc "$DESC" \
+            --arg rel "$RELEASE_URL" \
+            --arg inst "$INSTALLER_URL" \
+            --argjson color "$COLOR" \
+            '{
+              username: "Schnell Firmware",
+              embeds: [{
+                title: $title,
+                description: $desc,
+                color: $color,
+                fields: [
+                  { name: "📥 Install in browser", value: "[Open the configuration tool](\($inst))" },
+                  { name: "📝 Release notes", value: "[GitHub release page](\($rel))" }
+                ]
+              }]
+            }')
+          curl -sf -H "Content-Type: application/json" -d "$payload" "$WEBHOOK" \
+            || echo "::warning::Discord announcement failed (release was still published)."
+
       # Tell the web configuration tool to pull these release assets and
       # redeploy GitHub Pages. Requires a PAT with write access to that repo
       # stored as the WEB_TOOL_DISPATCH_TOKEN secret (GITHUB_TOKEN cannot
