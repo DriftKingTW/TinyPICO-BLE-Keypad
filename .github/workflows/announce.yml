@@ -1,0 +1,36 @@
+name: Announce release on Discord
+
+# Manually post a Discord announcement for an existing release — e.g. to
+# back-announce a version, or re-send one. Normal releases announce
+# automatically from release.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to announce (e.g. v1.2.0 or v1.2.0-beta.1)'
+        required: true
+      note:
+        description: 'Announcement text (optional; defaults to the tag message)'
+        required: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so the tag message can be read
+
+      - name: Announce on Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TAG: ${{ github.event.inputs.tag }}
+          NOTE: ${{ github.event.inputs.note }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "::error::DISCORD_WEBHOOK_URL secret is not set."
+            exit 1
+          fi
+          bash scripts/announce-discord.sh
