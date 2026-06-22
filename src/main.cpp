@@ -720,6 +720,19 @@ void loop() {
     // Accept Serial input for keyconfig.json
     if (Serial.available() > 0) {
         String jsonString = Serial.readString();
+        jsonString.trim();
+
+        // Config read request: dump the current keyconfig.json (wrapped in
+        // markers) so the configuration tool can import what's on the device.
+        // Emit as a single write to minimize interleaving with Serial output
+        // from tasks running on the other core.
+        if (jsonString == "READ_CONFIG") {
+            Serial.print("\n<<<CONFIG_BEGIN>>>\n" +
+                         loadJSONFileAsString("keyconfig") +
+                         "\n<<<CONFIG_END>>>\n");
+            return;
+        }
+
         Serial.println("Received JSON:");
         Serial.println(jsonString);
 
