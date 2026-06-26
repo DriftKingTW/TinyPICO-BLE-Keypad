@@ -109,6 +109,7 @@ volatile bool isSoftAPEnabled = false;
 volatile bool isGoingToSleep = false;
 volatile bool clearDisplay = false;
 volatile bool isSwitchingBootMode = false;
+volatile bool isScanningWifi = false;
 volatile bool isCaffeinated = false;
 volatile bool isOutputLocked = false;
 volatile bool isScreenInverted = false;
@@ -331,7 +332,17 @@ void generalTask(void *pvParameters) {
 
     while (true) {
         checkBattery();
-        
+
+        // While a (blocking) WiFi scan runs on the other core, hold the scan
+        // hint on screen and skip the normal status updates so they don't flash
+        // over it.
+        if (isScanningWifi) {
+            Display::setBottom("Scanning WiFi..");
+            Display::setIcon(2);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         // if (isDetectingLastConnectedDevice && BleHid::isConnected() &&
         //     bleKeyboard.getCounnectedCount() > 1) {
         // isDetectingLastConnectedDevice = false;
@@ -730,6 +741,91 @@ void loop() {
             Serial.print("\n<<<CONFIG_BEGIN>>>\n" +
                          loadJSONFileAsString("keyconfig") +
                          "\n<<<CONFIG_END>>>\n");
+            return;
+        }
+
+        // WiFi read request: dump the currently stored SSID (password is never
+        // sent back) so the configuration tool can pre-fill its WiFi form.
+        if (jsonString == "READ_WIFI") {
+            DynamicJsonDocument stored(256);
+            deserializeJson(stored, loadJSONFileAsString("config"));
+            DynamicJsonDocument out(128);
+            out["ssid"] = stored["ssid"] | "";
+            String buffer;
+            serializeJson(out, buffer);
+            Serial.print("\n<<<WIFI_BEGIN>>>\n" + buffer + "\n<<<WIFI_END>>>\n");
+            return;
+        }
+
+        // WiFi scan request: scan for nearby networks and return their SSID /
+        // RSSI so the configuration tool can offer them as suggestions. When
+        // not already in WiFi mode the radio is briefly switched on for the
+        // scan and turned back off afterwards.
+        if (jsonString == "SCAN_WIFI") {
+            // Show a hint on the OLED while the (blocking) scan runs. The render
+            // task on core 0 watches this flag and holds the message, then
+            // resumes normal status updates once it clears.
+            isScanningWifi = true;
+
+            bool wifiWasOff = (WiFi.getMode() == WIFI_MODE_NULL);
+            if (wifiWasOff) {
+                WiFi.mode(WIFI_STA);
+            }
+
+            int n = WiFi.scanNetworks();
+            // Sized for a crowded RF environment (~80 networks); entries are
+            // silently dropped once capacity is exceeded.
+            DynamicJsonDocument out(8192);
+            JsonArray networks = out.createNestedArray("networks");
+            for (int i = 0; i < n; i++) {
+                String foundSsid = WiFi.SSID(i);
+                if (foundSsid.isEmpty()) {
+                    continue;  // skip hidden networks
+                }
+                JsonObject net = networks.createNestedObject();
+                net["ssid"] = foundSsid;
+                net["rssi"] = WiFi.RSSI(i);
+            }
+            WiFi.scanDelete();
+
+            if (wifiWasOff) {
+                WiFi.mode(WIFI_MODE_NULL);
+            }
+
+            isScanningWifi = false;
+
+            String buffer;
+            serializeJson(out, buffer);
+            Serial.print("\n<<<WIFISCAN_BEGIN>>>\n" + buffer +
+                         "\n<<<WIFISCAN_END>>>\n");
+            return;
+        }
+
+        // WiFi write request: "WRITE_WIFI" followed by a JSON object holding
+        // ssid/password. Persisted to /config.json (the same file the web
+        // server reads on boot into WiFi mode).
+        if (jsonString.startsWith("WRITE_WIFI")) {
+            String wifiJson = jsonString.substring(strlen("WRITE_WIFI"));
+            wifiJson.trim();
+
+            DynamicJsonDocument doc(256);
+            DeserializationError err = deserializeJson(doc, wifiJson);
+            if (err || doc.isNull() || !doc.containsKey("ssid")) {
+                Serial.println("WiFi config invalid");
+                return;
+            }
+
+            File configFile = SPIFFS.open("/config.json", "w");
+            if (!configFile) {
+                Serial.println("Failed to open config file for writing");
+                return;
+            }
+            if (serializeJson(doc, configFile) == 0) {
+                Serial.println("Failed to write to config file");
+            } else {
+                Serial.println("WiFi config updated!");
+            }
+            configFile.close();
             return;
         }
 
