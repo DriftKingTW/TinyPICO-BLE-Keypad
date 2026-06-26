@@ -773,7 +773,9 @@ void loop() {
             }
 
             int n = WiFi.scanNetworks();
-            DynamicJsonDocument out(4096);
+            // Sized for a crowded RF environment (~80 networks); entries are
+            // silently dropped once capacity is exceeded.
+            DynamicJsonDocument out(8192);
             JsonArray networks = out.createNestedArray("networks");
             for (int i = 0; i < n; i++) {
                 String foundSsid = WiFi.SSID(i);
